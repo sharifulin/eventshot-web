@@ -1,5 +1,6 @@
 basis.require('basis.app');
 basis.require('basis.ui');
+basis.require('app.router');
 ;;;basis.require('basis.devpanel');
 
 
@@ -9,6 +10,14 @@ module.exports = basis.app.create({
   init: function(){
     var pages = new basis.ui.Node({
       selection: true,
+      listen: {
+        selection: {
+          itemsChanged: function(selection){
+            if (!selection.itemCount)
+              this.firstChild.select();
+          }
+        }
+      },
       childClass: {
         template: resource('app/template/page.tmpl'),
         handler: {
@@ -24,23 +33,29 @@ module.exports = basis.app.create({
       childNodes: [
         {
           selected: true,
-          name: 'index',
+          name: 'welcome',
           lazyContent: resource('module/welcome/index.js')
         },
         {
-          name: 'wizard',
+          name: 'add-event',
+          router: '/add-event',
           lazyContent: resource('module/wizard/index.js')
         },
         {
-          name: 'event-list',
+          name: 'list',
+          router: '/list',
           lazyContent: resource('module/eventlist/index.js')
         },
         {
           name: 'event',
+          router: /^\/event(\/.*)?$/,
           lazyContent: resource('module/event/index.js')
         }
       ]
     });
+
+    /** @cut */ basis.router.debug = true;
+    basis.router.start();
 
     return new basis.ui.Node({
       template: resource('app/template/layout.tmpl'),
@@ -57,7 +72,8 @@ module.exports = basis.app.create({
             },
             action: {
               click: function(){
-                this.delegate.select();
+                var name = this.delegate.name;
+                basis.router.navigate(name == 'welcome' ? '' : '/' + name + (name == 'event' ? '/123' : ''));
               }
             }
           }
