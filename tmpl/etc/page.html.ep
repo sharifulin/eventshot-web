@@ -1,0 +1,54 @@
+% my $N = stash('page_size') || 6; my $M = int($N/2)+1;
+% my $p = stash('page') || return;
+
+% my $c = $p->{page} > $M ? $M : $p->{page};
+% my @p = @{$p->{paging}||[]};
+
+% @p = splice @p, ($p->{page}-$c+$N > $p->{paging}->[-1] ? $p->{paging}->[-1]-$N : $p->{page}-$c), $N if @p > $N;
+
+% if ($p && @p > 1) {
+
+% my $li = begin
+	% my $i = shift; my $v = shift;
+	% if ($i == 1) {
+		<noindex>
+			<a href="<%= page_param %>" <%== 'class="active"' if $p->{page} == $i %> rel="nofollow"><%= $v %></a>
+		</noindex>
+	% } else {
+		<a href="<%= page_param($i) %>" <%== 'class="active"' if $p->{page} == $i %>><%= $v %></a>
+	% }
+% end
+
+<div class="pagination group">
+	<div class="prev_next">
+		<span>Pages: </span>
+		
+		<span>&larr;</span>
+		% if ($p->{prev}) {
+			%== $li->($p->{prev} => 'previous')
+		% } else {
+			<span class="paging">previous</span>
+		% }
+		&nbsp;
+		% if ($p->{next}) {
+			%== $li->($p->{next} => 'next')
+		% } else {
+			<a href="#">next</a>
+		% }
+		<a href="#">&rarr;</a>
+	</div>
+	<div class="page_nums">
+	% unless ($p[0] == $p->{paging}->[0]) {
+		%== $li->($p[0]-1 => '«')
+	% }
+
+	% for (@p) {
+		%== $li->($_ => $_)
+	% }
+
+	% unless ($p[-1] == $p->{paging}->[-1]) {
+		%== $li->($p[-1]+1 => '»')
+	% }
+	</div>
+</div>
+% }

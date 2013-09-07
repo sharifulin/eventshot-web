@@ -1,0 +1,90 @@
+% layout 'admin', title => 'Admins';
+% my $url = url_for 'admin_admin';
+
+<div class="page-header">
+	<h1><%= stash('title') %></h1>
+</div>
+<form class="form-search pull-right" action="<%= $url %>" method="get">
+	<input type="text" name="q" class="search-query" value="<%= param('q') %>" placeholder="Search">
+</form>
+
+<div class="pull-right top_button_group">
+	<a href="<%= url_for 'admin_admin_add' %>" class="btn btn-success"><i class="icon-plus icon-white"></i> Add</a>
+</div>
+
+% if (@$list) {
+
+% my $list_action = begin
+	<div class="btn-group pull-left">
+		<a class="btn dropdown-toggle" data-toggle="dropdown" href="#">Actions <span class="caret"></span></a>
+		<ul class="dropdown-menu action_list">
+			<li><a href="#" data-action="hidden">Hide</a></li>
+			<li><a href="#" data-action="!hidden">Active</a></li>
+			<li><a href="#" data-action="remove">Delete</a></li>
+		</ul>
+	</div>
+	<div class="clear"></div>
+	%== include 'admin/etc/page'
+	<small class="total"><b>Total</b> <%= $page->{max} %></small>
+% end
+
+	<form action="" method="post">
+		<input type="hidden" name="action" value="">
+		%== $list_action->();
+		<table class="table table-striped datatable">
+		<thead>
+			<tr>
+				<th width="10"><input type="checkbox" class="master" /></th>
+				<th>Name</th>
+				<th>E-mail</th>
+				<th>Status</th>
+				<th>Created</th>
+				<th>&nbsp;</th>
+				<th>&nbsp;</th>
+			</tr>
+		</thead>
+		<tbody>
+		% for (@$list) {
+			<tr>
+				<td><input type="checkbox" name="id" value="<%= $_->{id} %>" class="slave" /></td>
+				<td>
+					<a href="<%= url_for 'admin_admin_edit', id => $_->{id} %>" title="Edit"><%= $_->{name} %></a><br/>
+					<%= $_->{position} %>
+				</td>
+				<td><a href="mailto:<%= $_->{email} %>" title="Send email"><%= $_->{email} %></a></td>
+				<td style="<%= 'color:green' unless $_->{hidden} || $_->{access_stat_frodio} %>">
+					<%= $_->{hidden} ? 'Hide' : 'Active' %>
+				</td>
+				<td class="nowrap" data-sort="<%= $_->{created} %>"><%= $_->{created} ? u(iso2human => $_->{created}) : 'none' %></td>
+				<td>
+					<a href="<%= url_for 'admin_admin_edit', id => $_->{id} %>" class="edit"><i class="icon-edit"></i></a>
+				</td>
+				<td class="delete">
+					<a href="<%= url_for 'admin_admin_remove', id => $_->{id} %>" class="remove"><i class="icon-trash"></i></a>
+				</td>
+			</tr>
+		% }
+		</tbody>
+		</table>
+		%== $list_action->()
+	</form>
+	
+	%== include 'admin/etc/tablesorter'
+	
+	<script type="text/javascript">
+		$('.datatable').dataTable({
+			"bPaginate": false,
+			"bFilter": false,
+			"bInfo": false,
+			"aoColumnDefs": [ 
+				{ "bSortable": false, "aTargets": [ 0, 5 ] },
+				{ "sSortDataType": "data-sort", "aTargets": [ 4 ] }
+			]
+		});
+	</script>
+% } else {
+	<div class="alert alert-info">
+		<button class="close" data-dismiss="alert">×</button>
+		<strong>No data</strong>
+	</div>
+% }

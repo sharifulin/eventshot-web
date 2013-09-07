@@ -1,0 +1,5 @@
+#!/usr/bin/env perl
+use strict;
+use lib qw(.. ../lib);
+my $OPTIONS = join ' ',map {/\s/ ? "\"$_\"" : $_} @ARGV;
+system qq(/usr/bin/env mysql -u$_->{'user'} @{[ $_->{'password'} ? "-p$_->{'password'}" : '' ]} -h$_->{'datasource'}->{'host'} $OPTIONS $_->{'datasource'}->{'database'}) for require "conf/mysql.conf";

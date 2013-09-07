@@ -1,0 +1,58 @@
+% layout 'admin', title => 'Admins';
+% my $item = stash 'item';
+
+<div class="page-header">
+	<h1><a href=""><%= stash('add') ? 'Add admin' : "Edit admin «$item->{name}»" %></a></h1>
+</div>
+
+<div class="btn-group pull-right top_button_group">
+	<a href="<%= url_for 'admin_admin' %>" class="btn">List</a>
+</div>
+
+% if (stash 'save') {
+	<div class="clear last"></div>
+	<div class="alert alert-success"><a class="close" data-dismiss="alert" href="#">×</a> Save changes!</div>
+% } elsif (stash 'error') {
+	<div class="clear last"></div>
+	<div class="alert alert-error"><a class="close" data-dismiss="alert" href="#">×</a> Incorrect form data. Please check again.</div>
+% }
+
+<form action="" method="post" enctype="multipart/form-data">
+	% unless (stash 'add') {
+		<label class="last"><b>Created date:</b> <span class="note"><%= $item->{created} ? u(iso2human => $item->{created}) : '' %></span></label>
+	% }
+	<div class="control-group<%= (check_error 'email') ? ' error' : '' %>">
+		<label for="email" class="control-label">E-mail: <span class="req">*</span></label>
+		<input type="text" id="email" name="email" class="span4" value="<%= param('email') // $item->{email} %>" autocomplete="off">
+		<span class="help-block"><%= check_error 'email' %></span>
+	</div>
+	<div class="control-group<%= (check_error 'password') ? ' error' : '' %>">
+		
+		<label for="password" class="control-label" title="<%= $item->{password} %>">Password: <span class="req">*</span></label>
+		<input type="password" id="password" class="span4" name="password" value="<%= param('password') // $item->{password} %>" autocomplete="off">
+		<span class="help-block"><%= check_error 'password' %></span>
+	</div>
+	<div class="control-group<%= (check_error 'name') ? ' error' : '' %>">
+		<label for="name" class="control-label">Name: <span class="req">*</span></label>
+		<input type="text" id="name" class="span4" name="name" value="<%= param('name') // $item->{name} %>">
+		<span class="help-block"><%= check_error 'name' %></span>
+	</div>
+	<div class="control-group<%= (check_error 'position') ? ' error' : '' %>">
+		<label for="position" class="control-label">Position:</label>
+		<input type="text" id="position" class="span4" name="position" value="<%= param('position') // $item->{position} %>">
+		<span class="help-block"><%= check_error 'position' %></span>
+	</div>
+	
+	<div class="control-group last">
+		% my $hidden = param('hidden') // $item->{hidden};
+		<label class="checkbox" for="hidden">
+			<input id="hidden" type="checkbox" name="hidden" value="1" <%= 'checked' if $hidden %>/> Hide?
+		</label>
+		<p class="help-block"><strong>Note:</strong> Site for hidden users is unavailable!</p>
+	</div>
+	
+	<div class="form-actions">
+		<input type="submit" class="btn btn-primary" value="<%= stash('add') ? 'Add' : 'Save' %>" />
+		<a href="<%= url_for 'admin_admin' %>/" class="btn">Cancel</a>
+	</div>
+</form>

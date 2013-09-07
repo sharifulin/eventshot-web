@@ -1,0 +1,5 @@
+% if (stash 'save') {
+	<div class="message success"><p>Changes successfully saved</p></div>
+% } else {
+	<div class="message errormsg"><p>An error occured, please try again</p></div>
+% }

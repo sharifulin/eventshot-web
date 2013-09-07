@@ -1,0 +1,8 @@
+% my $item = stash 'item';
+
+<select name="role" class="span1">
+	% for (@$user_role) {
+        % my $selected = $_->[0] eq $item->{role} ? 'selected' : '';
+		<option value="<%= $_->[0] %>" <%= $selected %>><%= $_->[0] %></option>
+    % }
+</select>

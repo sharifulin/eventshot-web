@@ -1,0 +1,39 @@
+% my $N = stash('page_size') || 6; my $M = int($N/2)+1;
+% my $p = stash('page') || return;
+
+% my $c = $p->{page} > $M ? $M : $p->{page};
+% my @p = @{$p->{paging}||[]};
+
+% @p = splice @p, ($p->{page}-$c+$N > $p->{paging}->[-1] ? $p->{paging}->[-1]-$N : $p->{page}-$c), $N if @p > $N;
+
+% if ($p && @p > 1) {
+
+% my $li = begin
+	% my $i = shift; my $v = shift;
+	% if ($i == 1) {
+		<li <%== 'class="active"' if $p->{page} == $i %>>
+			<a href="<%= page_param %>" rel="nofollow"><%= $v %></a>
+		</li>
+	% } else {
+		<li <%== 'class="active"' if $p->{page} == $i %>>
+			<a href="<%= page_param($i) %>"><%= $v %></a>
+		</li>
+	% }
+% end
+
+<div class="pagination pull-right">
+	<ul>
+	% unless ($p[0] == $p->{paging}->[0]) {
+		%== $li->($p[0]-1 => '…')
+	% }
+
+	% for (@p) {
+		%== $li->($_ => $_)
+	% }
+
+	% unless ($p[-1] == $p->{paging}->[-1]) {
+		%== $li->($p[-1]+1 => '…')
+	% }
+	</ul>
+</div>
+% }

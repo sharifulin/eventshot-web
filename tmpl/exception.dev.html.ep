@@ -1,0 +1,34 @@
+% layout 'admin', simple => 1, title => 'Page temporarily unavailable';
+% my $e = delete $self->stash->{'exception'};
+
+<style>
+	p { color: #000; margin-left: 20px; font-size: 16px; }
+	.error { color: red; margin-top:20px; font-weight: bold; }
+	pre { margin: 20px; font-size:12px; }
+</style>
+
+<p><%= $e->message %></p>
+
+<p>
+% for my $line (@{$e->lines_before}) {
+	<%= $line->[0] %>: <%= $line->[1] %><br/>
+% }
+</p>
+
+% if ($e->line->[0]) {
+	<p class="error"><%= $e->line->[0] %>: <%= $e->line->[1] %></p>
+% }
+
+<p>
+% for my $line (@{$e->lines_after}) {
+	<%= $line->[0] %>: <%= $line->[1] %></br/>
+% }
+</p>
+
+<br/>
+
+% my $defaults = join '|', keys %{$self->app->defaults};
+% my $stashs   = { map { $_ => stash $_ } grep { $_ !~ /^mojo\.|snapshot|$defaults/ } keys %{ stash || {} } };
+<p>Stash params: <pre><%= dumper $stashs %></pre></p>
+
+<p>Request: <pre><%= $self->req->to_string %></pre><p>

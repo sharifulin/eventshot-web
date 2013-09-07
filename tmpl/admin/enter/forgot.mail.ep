@@ -1,0 +1,3 @@
+% stash subject => 'Password recovery';
+
+Your password:  <%= $user->{password} %>.

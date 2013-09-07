@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	% my $t = stash('title'); my @title = ref $t ? @$t : $t||();
+	<title><%= join ' – ', @title, 'Admin', conf('meta')->{title} %></title>
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
+
+	<link href="/css/bootstrap.css" rel="stylesheet">
+	<link href="/css/bootstrap-responsive.css" rel="stylesheet">
+	<link href="/css/custom.css" rel="stylesheet">
+	
+	<script type="text/javascript" src="/js/jquery-1.8.2.min.js"></script>	
+	<script type="text/javascript" src="/js/bootstrap.min.js"></script>
+	
+	<link href="/js/datepicker/datepicker.css" rel="stylesheet">
+	<script type="text/javascript" src="/js/datepicker/bootstrap-datepicker.js"></script>
+	
+	<!--[if lt IE 9]>
+		<script src="http://html5shim.googlecode.com/svn/trunk/html5.js"></script>
+	<![endif]-->
+</head>
+<body>
+	% unless (stash 'simple') {
+	<div class="navbar navbar-inverse">
+		<div class="navbar-inner">
+			<div class="container">
+				<a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+					<span class="icon-bar"></span>
+					<span class="icon-bar"></span>
+					<span class="icon-bar"></span>
+				</a>
+				<a class="brand" href="/admin/admin">EventShot</a>
+				<div class="nav-collapse">
+					<ul class="nav">
+						<% for (
+							['/admin/admin' => '<i class="icon-wrench icon-white"></i> Admins'],
+						) { %>
+							<li class="<%= 'dropdown' if $_->[2] %><%= ' active' if cur_path(1) =~ m/$_->[0]/ %>">
+								<a href="<%= $_->[0] =~ m{^http://} ? $_->[0] : url_for->path("$_->[0]") %>"<%== ' target="_blank"' if $_->[0] =~ m{^http://} %><%== ' class="dropdown-toggle" data-toggle="dropdown" data-target="#"' if $_->[2] %>><%== $_->[1] %><% if ($_->[2]) { %><b class="caret"></b><% } %></a>
+								% if ($_->[2]) {
+								<ul class="dropdown-menu">
+									% for my $li (@$_[2..@$_-1]) {
+									<li><a href="<%= $li->[0] ? $li->[0] =~ m{^http://} ? $li->[0] : url_for("admin_$li->[0]") : '' %>" target="<%= '_blank' if $li->[0] && $li->[0] =~ m{^http://} %>"><%== $li->[1] %></a></li>
+									% }
+								</ul>
+								% }
+							</li>
+						<% } %>
+					</ul>
+					<ul class="nav pull-right">
+						<li class="dropdown">
+							<a href="#" class="dropdown-toggle" data-toggle="dropdown" data-target="#"><%= user_name(stash 'ADMIN') || 'Admin' %> <b class="caret"></b></a>
+							<ul class="dropdown-menu">
+								<li><a href="<%= user_logged(stash 'ADMIN') ? url_for 'admin_admin_edit', id => stash('ADMIN')->{id} : '#admin' %>"><i class="icon-file"></i> Profile</a></li>
+								<li><a href="/admin/logout/"><i class="icon-off"></i> Logout</a></li>
+							</ul>
+						</li>
+					</ul>
+				</div>
+			</div>
+		</div>
+	</div>
+	% }
+	
+	<div class="container">
+		%== content
+	</div>
+	
+	% unless (stash 'simple') {
+	<footer class="footer form-actions">
+		© 2013 <%= conf('meta')->{title} %> — <a href="<%= conf('server')->{www} %>"><%= conf('server')->{www} %></a>
+		
+		<div class="pull-right">
+			 Perl v.<%= $] %>, Mojolicious v.<%= $Mojolicious::VERSION %>
+		</div>
+	</footer>
+	% }
+	
+	<script type="text/javascript">
+		$('.action_list a').click(function() {
+			$('input[name=action]').val($(this).attr('data-action'));
+			$(this).parents('form').submit();
+			return false;
+		});
+		$('.remove').click(function() {
+			return confirm('Delete selected item?');
+		});
+		$('.datepicker').datepicker({
+			format: 'dd.mm.yyyy',
+			weekStart: 1,
+			todayHighlight: true
+		});
+		
+		// magic checkboxes
+		$.fn.extend({
+			checked: function(val) {
+				return val ? $(this).attr('checked', val) : $(this).removeAttr('checked');
+			},
+		});
+		$(':checkbox').change(function(){
+			if ($(this).is('.master')) {
+				$('.slave').checked($('.slave:checked').size() ? 0 : 1);
+				$(this).removeClass('indeterminate').checked($('.slave:checked').size() == $('.slave').size() ? 1 : 0);
+			} else {
+				if($('.slave:checked').size() != $('.slave').size()) {
+					$('.master').checked($('.slave:checked').size() ? 1 : 0);
+					$('.slave:checked').size() ? $('.master').addClass('indeterminate') : $('.master').removeClass('indeterminate');
+				} else {
+					$('.master').removeClass('indeterminate').checked(1);
+				}
+			}
+		});
+	</script>
+</body>
+</html>

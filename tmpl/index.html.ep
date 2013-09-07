@@ -1,0 +1,5 @@
+% layout 'default', title => 'EventShot';
+
+<div style="text-align:center">
+	<img src="/logo.jpg" alt="eventshot">
+</div>

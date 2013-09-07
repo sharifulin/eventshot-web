@@ -1,0 +1,13 @@
+<select name="<%= $select_type %>" class="span2">
+	# default countries [ru, us]
+	% my %first = map { $_ => delete $country->{$_} } qw(ru us);
+	% for (sort keys %first) {
+		<option value="<%= $_ %>" <%= $_ eq $selected_country ? 'selected' : '' %>><%= $first{$_} %></option>
+	% }
+
+	<option disabled></option>
+
+	% for (sort keys %$country) {
+		<option value="<%= $_ %>" <%= $_ eq $selected_country ? 'selected' : '' %>><%= $country->{$_} %></option>
+    % }
+</select>

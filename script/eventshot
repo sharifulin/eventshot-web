@@ -1,0 +1,16 @@
+#!/usr/bin/env perl
+use common::sense;
+use lib qw(lib /tk/lib /tk/mojo4/lib);
+
+BEGIN {
+	# DEV
+	# $ENV{DBI_UTIL_DEBUG}++;
+	
+	$ENV{DEV}++; # if qx(pwd) =~ /dev/;
+	$ENV{MOJO_MODE} ||= $ENV{DEV} ? 'dev' : 'production';
+	$ENV{MOJO_TMPDIR} = '/tk/www/eventshot.me/tmp/upload'; # XXX: for scripts
+	$ENV{MOJO_MAX_MESSAGE_SIZE} = 50 * 1024 * 1024;
+};
+
+# use Devel::SimpleTrace;
+require Mojolicious::Commands; Mojolicious::Commands->start_app('App');
