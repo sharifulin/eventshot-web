@@ -1,0 +1,11 @@
+.tmp-tab
+{
+  margin: 2px;
+  background: #E0E0E0;
+  padding: 4px;
+  cursor: pointer;
+}
+.tmp-tab:hover
+{
+  background: gold;
+}
