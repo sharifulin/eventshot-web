@@ -1,0 +1,7 @@
+{
+    "name": "eventShot",
+    "version": "0.0.1",
+    "dependencies": {
+        "basisjs": "0.10.0"
+    }
+}
