@@ -1,4 +1,14 @@
 .app-eventlist-item
 {
-
+  width: 33%;
+  float: left;
+  border: 1px solid #888;
+  padding: 50px 20px;
+  margin: 10px;
+  background: #E0E0E0;
+}
+.app-eventlist-item:hover
+{
+  cursor: pointer;
+  background: gold;
 }

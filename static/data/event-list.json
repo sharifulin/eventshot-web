@@ -1,0 +1,16 @@
+[
+  {
+    id: 1,
+    title: 'Foo bar',
+    startDate: '2013-09-01',
+    endDate: '2013-09-15',
+    description: 'Lorem ipsum ...'
+  },
+  {
+    id: 2,
+    title: 'TechCrunch',
+    startDate: '2013-09-07 12:30:00',
+    endDate: '2013-09-08 10:00:00',
+    description: 'Lorem ipsum ...'
+  }
+]

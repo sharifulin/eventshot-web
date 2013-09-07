@@ -1,3 +1,4 @@
 module.exports = {
-  // TypeName: resource('type/typeName.js').fetch()
+  Event: resource('type/event.js').fetch(),
+  Entry: resource('type/entry.js').fetch()
 };

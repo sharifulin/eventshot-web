@@ -62,21 +62,19 @@ module.exports = basis.app.create({
       binding: {
         tabs: new basis.ui.Node({
           template: resource('app/template/tabs.tmpl'),
-          dataSource: pages.getChildNodesDataset(),
           childClass: {
             template: resource('app/template/tab.tmpl'),
             binding: {
-              title: function(node){
-                return node.delegate.name;
-              }
+              title: 'data:value'
             },
             action: {
               click: function(){
-                var name = this.delegate.name;
-                basis.router.navigate(name == 'welcome' ? '' : '/' + name + (name == 'event' ? '/123' : ''));
+                var name = this.data.value;
+                basis.router.navigate(name == 'welcome' ? '' : '/' + name);
               }
             }
-          }
+          },
+          childNodes: basis.data.wrap(['welcome', 'list', 'add-event'], true)
         }),
         pages: pages
       }
