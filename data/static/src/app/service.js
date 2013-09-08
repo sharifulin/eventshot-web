@@ -19,7 +19,7 @@ var defaultService = new basis.net.service.Service({
       if (app.onProvidersInit)
       {
         app.onProvidersInit();
-        app.onProvidersInit = null;
+        //app.onProvidersInit = null;
       }
     }
   );
