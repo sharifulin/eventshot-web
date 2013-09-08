@@ -2,10 +2,14 @@
 {
   margin: 5px;
   padding: 5px;
+  min-height: 1.8em;
+  margin-left: -19px;
+  overflow: hidden;
 }
 
 .app-event-entry_source-icon
 {
   float: left;
-  margin-right: 8px;
+  margin-right: 16px;
+  border: 3px solid white;
 }

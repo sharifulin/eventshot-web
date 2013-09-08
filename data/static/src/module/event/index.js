@@ -26,7 +26,9 @@ var EntryNode = new basis.ui.Node.subclass({
         return app.type.Provider.assets[node.data.source];
       }
     },
-    content: 'data:data'
+    content: 'data:data',
+    type: 'data:type',
+    id: 'data:id'
   }
 });
 
@@ -34,13 +36,16 @@ var entryViews = {
   text: EntryNode.subclass({
     template: resource('template/entry-text.tmpl'),
     binding: {
+      content: 'data:data.title'
     }
   }),
   photo: EntryNode.subclass({
     template: resource('template/entry-photo.tmpl'),
     binding: {
-      url: 'data:data.url',
-      title: 'data:data.title'
+      url: 'data:data.photo',
+      title: 'data:data.title',
+      width: 'data:data.width',
+      height: 'data:data.height'
     }
   })
 };
@@ -130,7 +135,25 @@ var view = new basis.ui.Node({
         }
       },
 
-      sorting: 'data.id',
+      sorting: 'data.created',
+      grouping: {
+        groupGetter: function(node){
+          return node.data.created.split(' ')[0]
+        },
+        childClass: {
+          template: resource('template/day.tmpl'),
+          binding: {
+            title: {
+              events: 'update',
+              getter: function(node){
+                var parts = node.data.title.split('-');
+                return months[parts[1] - 1] + ' ' + Number(parts[2]);
+              }
+            }
+          }
+        }
+      },
+
       childClass: EntryNode,
       childFactory: function(config){
         var ItemClass = entryViews[config.delegate.data.type] || EntryNode;

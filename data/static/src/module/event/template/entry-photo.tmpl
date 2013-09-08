@@ -3,9 +3,13 @@
 
 <b:include src="entry.tmpl" class="app-event-entry-photo">
   <b:replace ref="content">
-    <div class="app-event-entry-photo_photo-card">
-      <img class="app-event-entry-photo_image" src="{url}" height="100"/>
-      <div class="app-event-entry-photo_title app-event-entry-photo_title__{title}">{title}</div>
+    <div class="app-event-entry-photo_photo-card_wrapper">
+      <div class="app-event-entry-photo_photo-card">
+        <img class="app-event-entry-photo_image" src="{url}" width="{width}" height="{height}"/>
+        <div class="app-event-entry-photo_title app-event-entry-photo_title__{title}">
+          <span class="app-event-entry-photo_title-text">{title}</span>
+        </div>
+      </div>
     </div>
   </b:replace>
 </div>

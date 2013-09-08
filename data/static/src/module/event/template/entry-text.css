@@ -1,0 +1,11 @@
+.app-event-entry-text_wrapper
+{
+  border: 1px solid #F0F0F0;
+  border-color: #F0F0F0 #E0E0E0 #E0E0E0 #F0F0F0;
+  overflow: hidden;
+  padding: .3em 5px;
+  border-radius: 3px;
+  box-shadow: 1px 1px 2px rgba(0,0,0,.05);
+  float: left;
+  max-width: 75%;
+}

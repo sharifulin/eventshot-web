@@ -1,6 +1,8 @@
 .app-event-entry-list
 {
   display: none;
+  border-left: 3px solid #E0E0E0;
+  margin-left: 20px;
 }
 .app-event-entry-list__visible
 {
