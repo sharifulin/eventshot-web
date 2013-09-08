@@ -11,6 +11,8 @@ var Event = basis.entity.createType('Event', {
   startDate: String,
   endDate: String,
   description: String,
+  status: Number,
+  providers: Array,
   entries: basis.entity.createSetType('Entry')
 });
 

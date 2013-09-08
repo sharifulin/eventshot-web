@@ -1,27 +1,37 @@
 {
-  id: 2,
-  title: 'TechCrunch',
-  startDate: '2013-09-07 12:30:00',
-  endDate: '2013-09-08 10:00:00',
-  description: 'Lorem ipsum ...',
-  entries: [
+  "id": 2,
+  "title": "TechCrunch",
+  "startDate": "2013-09-07 12:30:00",
+  "endDate": "2013-09-08 10:00:00",
+  "description": "Lorem ipsum ...",
+  "providers": [
+    "instagram",
+    "facebook"
+  ],
+  "status": 33,
+  "entries": [
     {
-      id: 3,
-      source: 'instagram',
-      type: 'photo',
-      content: 'http://eventshot.me/logo.jpg'
+      "id": 3,
+      "source": "instagram",
+      "type": "photo",
+      "data": {
+        "url": "http://eventshot.me/logo.jpg"
+      }
     },
     {
-      id: 4,
-      source: 'twitter',
-      type: 'text',
-      content: 'Lorem ipsum ...'
+      "id": 4,
+      "source": "twitter",
+      "type": "text",
+      "data": "Lorem ipsum ..."
     },
     {
-      id: 5,
-      source: 'instagram',
-      type: 'photo',
-      content: 'http://eventshot.me/logo.jpg'
+      "id": 5,
+      "source": "instagram",
+      "type": "photo",
+      "data": {
+        "title": "Lorem...",
+        "url": "http://eventshot.me/logo.jpg"
+      }
     }
   ]
 }

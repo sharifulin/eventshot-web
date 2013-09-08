@@ -8,6 +8,8 @@ module.exports = new basis.ui.Node({
   dataSource: app.type.Event.all,
   active: true,
   
+  sorting: 'data.id',
+  sortingDesc: true,
   childClass: {
     template: resource('template/item.tmpl'),
     binding: {
