@@ -1,4 +1,46 @@
-.app-eventlist-list
+.app-eventlist
 {
 
+}
+
+.app-eventlist-item.app-eventlist_new,
+.app-eventlist-item.app-eventlist_new:hover
+{
+  box-shadow: none;
+  border-color: transparent;
+  background: none;
+  overflow: visible;
+}
+.app-eventlist-item.app-eventlist_new:hover
+{
+  background-color: transparent;
+}
+.app-eventlist_new-overlay
+{
+  border: 4px dashed #EEE;
+  position: absolute;
+  margin: -1px;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+.app-eventlist_new-overlay:hover
+{
+  border-color: #DDD;
+  background-color: #FCFCFC;
+}
+.app-eventlist_new-overlay-icon
+{
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  background: url(img/plus.png) no-repeat center center;  
+  opacity: .15;
+}
+.app-eventlist_new-overlay-icon:hover
+{
+  opacity: .25;
 }

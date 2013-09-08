@@ -10,3 +10,14 @@ BODY
   font-size: small;
   font-family: Tahoma;
 }
+
+.app-layout
+{
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 0 10px;
+  border: 1px solid #EEE;
+  border-width: 0 1px;
+  min-height: 100%;
+  overflow: hidden;
+}

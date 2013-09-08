@@ -1,0 +1,19 @@
+.app-event-title
+{
+  padding: 8px 2px 0;
+  overflow: hidden;
+}
+.app-event-title_input
+{
+  margin: 5px 0px;
+  padding: 5px;
+  font-size: 180%;
+  border: 1px solid transparent;
+  width: 100%;
+  box-sizing: border-box;
+}
+.app-event-title_input:focus,
+.app-event-title_input:hover
+{
+  border-color: #CCC;
+}

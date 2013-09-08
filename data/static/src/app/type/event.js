@@ -5,9 +5,12 @@ basis.require('app.service');
 // main part
 //
 
+function nullString(value){
+  return value == null ? value : String(value);
+}
+
 var Event = basis.entity.createType('Event', {
   id: basis.entity.IntId,
-  title: String,
   startDate: {
     type: String,
     defValue: function(){
@@ -20,8 +23,14 @@ var Event = basis.entity.createType('Event', {
       return '2013-09-08';
     }
   },
-  description: String,
-  status: Number,
+
+  title: nullString,
+  description: nullString,
+  main_entry: 'Entry',
+
+  status: String,
+  progress: Number,
+  
   providers: {
     type: Array,
     defValue: function(){
@@ -36,16 +45,16 @@ var Event = basis.entity.createType('Event', {
 });
 
 Event.all.setSyncAction(app.service['default'].createAction({
-  //url: '/api/...',
-  url: 'data/event-list.json',
+  url: 'api/event',
+  //url: 'data/event-list.json',
   success: function(data){
-    this.sync(basis.array(data).map(Event.reader));
+    this.sync(basis.array(data.events).map(Event.reader));
   }
 }));
 
 Event.extend({
   syncAction: app.service['default'].createAction({
-    url: 'data/event-:id.json',
+    url: 'api/event/:id',
     request: function(){
       return {
         routerParams: {
@@ -54,7 +63,7 @@ Event.extend({
       }
     },
     success: function(data){
-      this.update(Event.reader(data));
+      this.update(Event.reader(data.event));
     }
   }),
 
@@ -63,15 +72,15 @@ Event.extend({
     request: function(){
       return !this.data.id
         ? {
-            url: 'data/create.json',
-            params: basis.object.slice(this.data, [
-              'startDate',
-              'endDate',
-              'providers'
-            ])
+            url: 'api/event/create',
+            params: {
+              start_date: this.data.startDate,
+              end_date: this.data.endDate,
+              providers: this.data.providers
+            }
           }
         : {
-            url: 'data/event-:id.json',
+            url: 'api/event/:id',
             routerParams: {
               id: this.data.id
             },
@@ -82,8 +91,22 @@ Event.extend({
           };
     },
     success: function(data){
-      data.id = parseInt(Math.random() * 1000000, 10) + 2;      
-      this.update(Event.reader(data));
+      this.update(Event.reader(data.event));
+    }
+  }),
+
+  remove: app.service['default'].createAction({
+    method: 'POST',
+    url: 'api/:id/remove',
+    request: function(){
+      return {
+        routerParams: {
+          id: this.data.id
+        }
+      };
+    },
+    success: function(data){
+      this.destroy();
     }
   })
 });

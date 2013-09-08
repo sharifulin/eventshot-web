@@ -1,5 +1,10 @@
 <b:resource src="item.css" />
 
 <div class="app-eventlist-item" event-click="showDetails">
-  {title}
+  <div class="app-eventlist-item_defcover"/>
+  <!--{cover}-->
+  <div class="app-eventlist-item_label">
+    <div class="app-eventlist-item_title app-eventlist-item_title__{noTitle}">{title}</div>
+    <div class="app-eventlist-item_dates app-eventlist-item_dates__{noTitle}">{startDate} &mdash; {endDate}</div>
+  </div>
 </div>

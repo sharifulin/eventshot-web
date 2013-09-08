@@ -1,4 +1,11 @@
 .app-event
 {
+  overflow: hidden;
+  border: 1px solid red;
+  margin: 0 -2px;
+}
 
+.app-event_dates
+{
+  float: right;
 }

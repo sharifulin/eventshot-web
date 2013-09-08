@@ -1,4 +1,5 @@
 basis.require('basis.ui');
+basis.require('basis.router');
 
 var view = new basis.ui.Node({
   template: resource('template/view.tmpl'),
@@ -71,9 +72,9 @@ var view = new basis.ui.Node({
   ],
 
   handler: {
-    update: function(){
-      var node = this.data.id ? this.lastChild : this.firstChild;
-      node.select();
+    update: function(sender, delta){
+      if ('id' in delta && this.data.id)
+        basis.router.navigate('/event/' + this.data.id);
     }
   }  
 });

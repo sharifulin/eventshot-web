@@ -1,0 +1,8 @@
+.app-event-entry-list
+{
+  display: none;
+}
+.app-event-entry-list__visible
+{
+  display: block;
+}

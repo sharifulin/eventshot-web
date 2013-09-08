@@ -1,14 +1,75 @@
 .app-eventlist-item
 {
-  width: 33%;
+  width: 32.5%;
   float: left;
-  border: 1px solid #888;
-  padding: 50px 20px;
-  margin: 10px;
-  background: #E0E0E0;
+  border: 1px solid #D0D0D0;
+  box-shadow: 1px 1px 2px rgba(0,0,0,.1);
+  height: 180px;
+  margin-bottom: 10px;
+  margin-right: 10px;
+  background: white;
+  position: relative;
+  overflow: hidden;
+}
+.app-eventlist-item:nth-child(3n)
+{
+  float: none;
+  width: auto;
+  margin-right: 0;
 }
 .app-eventlist-item:hover
 {
   cursor: pointer;
-  background: gold;
+  background-color: #FCFCFC;
+  border-color: #BBB;
+  box-shadow: 1px 1px 3px rgba(0,0,0,.3);
+}
+
+.app-eventlist-item_defcover
+{
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: url(img/defaultbg.jpg) no-repeat center;
+  background-origin: border-box;
+  background-size: cover;
+  border: 3px solid rgba(255,255,255,.8);
+  opacity: .35;
+}
+.app-eventlist-item:hover .app-eventlist-item_defcover
+{
+  opacity: .45;
+}
+
+.app-eventlist-item_label
+{
+  background: padding-box rgba(255,255,255,.8);
+  border-right: 1px solid rgba(255,255,255,0.4);
+  padding: 4px 10px;
+  position: absolute;
+  right: -1px;
+  bottom: 10px;
+  text-align: right;
+  line-height: 1.5;
+}
+.app-eventlist-item_title,
+.app-eventlist-item_dates
+{
+
+}
+.app-eventlist-item_dates
+{
+  font-size: 82%;
+}
+.app-eventlist-item_title,
+.app-eventlist-item_dates__noTitle
+{
+  font-weight: bold;
+  font-size: 100%;
+}
+.app-eventlist-item_title__noTitle
+{
+  display: none;
 }

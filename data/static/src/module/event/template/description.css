@@ -1,0 +1,21 @@
+.app-event-description
+{
+  padding: 0 2px;
+  overflow: hidden;
+}
+.app-event-description_input
+{
+  margin: 0 2px;
+  padding: 5px;
+  font-size: 120%;
+  border: 1px solid transparent;
+  width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+  resize: none;
+}
+.app-event-description_input:focus,
+.app-event-description_input:hover
+{
+  border-color: #CCC;
+}
