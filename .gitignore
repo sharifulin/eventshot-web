@@ -2,3 +2,5 @@ tmp/
 log/
 data/video/
 static/lib/
+.DS_Store
+

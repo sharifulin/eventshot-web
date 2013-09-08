@@ -8,7 +8,7 @@ sub list {
 	my $list = $self->dw->event($self->db->select('select * from event where user_id=?', $USER->{id}));
 	
 	$self->render('json', {
-		events => [ map $self->_item($_, 'noentry'), @$list ]
+		events => [ map $self->_item($_, 'no_entries'), @$list ]
 	});
 }
 
@@ -55,18 +55,19 @@ sub create {
 	}
 	
 	$self->check;
-	$self->render('json', {event => $self->_item(undef, 'noentry')});
+	$self->render('json', {event => $self->_item(undef, 'no_entries,no_main')});
 }
 
 sub update {
 	my $self = shift;
 	my $item = $self->stash('item');
 	
-	$self->db->query(
-		'update event set title=?, description=?, soundtrack=? where id=?',
-		(map { $self->req->param($_) || undef } qw(title description soundtrack)),
-		$item->{id}
-	);
+	my $set  = join ', ',
+		'updated=now()',
+		map { $self->req->param($_) ? "$_=" . $self->db->quote($self->req->param($_)) : () } qw(title description soundtrack)
+	;
+	
+	$self->db->query("update event set $set where id=?", $item->{id});
 	
 	$self->check;
 	$self->render('json', {event => $self->_item});
@@ -87,7 +88,18 @@ sub remove {
 sub _item {
 	my $self = shift;
 	my $item = shift || $self->stash('item') || return;
-	my $flag = shift;
+	my $flag = shift || '';
+	
+	my $e =  [
+		sort { $a->{data}->{created} cmp $b->{data}->{created} }
+		map { +{
+			id     => $_->{id},
+			source => $_->{type},
+			type   => $_->{data} =~ /photo'\s*=>\s*'http/ ? 'photo' : 'text',
+			data   => eval $_->{data},
+		} }
+		@{ $item->{items}||[] }
+	];
 	
 	+{
 		(map { $_ => $item->{$_} } qw(id title description soundtrack status created)),
@@ -99,21 +111,8 @@ sub _item {
 		# XXX
 		progress  => 1 + int rand 100,
 		
-		$flag ? () : (
-			entries => [
-				map { +{
-					id      => $_->{id},
-					source  => $_->{type},
-					created => $_->{created},
-					data    => eval $_->{data},
-					# data    => {
-					# 	url   => 'http://eventshot.me/logo.jpg',
-					# 	title => 'Lorem...',
-					# }
-				} }
-				@{ $item->{items}||[] }
-			]
-		),
+		$flag !~ /no_entries/ ? (entries    => $e) : (),
+		$flag !~ /no_main/    ? (main_entry => [grep $_->{type} eq 'photo', @$e]->[0]) : (),
 	};
 }
 

@@ -8,6 +8,7 @@ use lib qw(../.. ../../lib /tk/mojo4/lib);
 use Mojo::Server;
 use Data::Dumper;
 use DateTime;
+use HTTP::Date;
 use DateTime::Format::Strptime;
 use JSON;
 
@@ -18,7 +19,7 @@ my $self = Mojo::Server->load_app('../eventshot');
 my $ua  = Mojo::UserAgent->new;
 
 # get events in queue
-my $queue = $self->db->select("select u.user_id as user_id, u.type as type, u.data as data, q.event_id as event_id, date(e.start_date) as start_date, date(e.end_date) as end_date from user_provider u join queue q on u.user_id = q.user_id join event e on q.event_id = e.id where q.status = 'wait' and u.user_id = 2");
+my $queue = $self->db->select("select distinct u.user_id as user_id, u.type as type, u.data as data, q.event_id as event_id, date(e.start_date) as start_date, date(e.end_date) as end_date from user_provider u join queue q on u.user_id = q.user_id join event e on q.event_id = e.id where q.status = 'wait' and u.user_id = 2");
 for (@$queue) {
 
     my @inserts;
@@ -52,7 +53,7 @@ for (@$queue) {
             }
         }
         when (/instagram/) {
-            my $images = $ua->get("https://api.instagram.com/v1/users/self/media/recent/" => form => { min_timestamp => $min_timestamp, access_token => $auth->{access_token} })->res->json;
+            my $images = $ua->get("https://api.instagram.com/v1/users/self/media/recent/" => form => { min_timestamp => $min_timestamp, max_timestamp => $max_timestamp, access_token => $auth->{access_token} })->res->json;
 
             for (@{ $images->{data} }) {
 
@@ -62,18 +63,37 @@ for (@$queue) {
         }
         when (/twitter/) {
 	        my $nt = Net::Twitter::Lite::WithAPIv1_1->new(
-					(map { $_ => $conf->{$_} } qw(consumer_key consumer_secret)),
-					(map { $_ => $auth->{$_} } qw(access_token access_token_secret)),
+				(map { $_ => $conf->{$_} } qw(consumer_key consumer_secret)),
+				(map { $_ => $auth->{$_} } qw(access_token access_token_secret)),
 			);
 			
-		    my @val = (map { $_ => $auth->{$_} } qw(access_token access_token_secret)),
 			my $data = $nt->verify_credentials;
+		    my $tweets = $nt->user_timeline({ count => 200, trim_user => 1});
+            #say scalar @$tweets;
 
-		    #my $list = $nt->user_timeline(count => 200, trim_user => 1);
-		    my $tweets = $nt->user_timeline();
+            # filter retweets, reply
+            $tweets = [
+                grep {
+                    my $what;
+                    $what->{retweet} = !!$_->{retweeted_status};
+                    $what->{reply  } = !!$_->{in_reply_to_user_id_str};
+                    $what->{tweet  } = !$what->{retweet} && !$what->{reply};
+                    #warn qq(It's tweet "$what->{tweet}", reply "$what->{reply}", retweet "$what->{retweet}": $_->{text}\n);
+
+                    my $epoch = at2time($_->{created_at});
+                    my $yes   = ($epoch >= $min_timestamp && $epoch <= $max_timestamp && $what->{tweet}) ? 1 : 0;
+                    $yes;
+                }
+                @$tweets
+            ];
+            
+            #say scalar @$tweets;
             for (@$tweets) {
-                say Dumper($_);
+                #push @inserts, [$event_id, $user_id, $type, Dumper($_), DateTime->now->datetime];
             }
+        }
+        when (/facebook/) {
+            say Dumper($auth);
         }
         default {}
     };
@@ -92,4 +112,10 @@ sub insert_event_item {
 			map { $_ } @$inserts
 		) . ' on duplicate key update data = values(data)'
 	);
+}
+
+sub at2time {
+    my $date = shift;
+    $date =~ s/\+0000 //;
+    str2time( $date ) + 60*60*4; # XXX: check zone
 }
