@@ -31,17 +31,16 @@ sub startup {
 	
 	# plugins
 	
-	$self->plugin(mail => {
+	$self->plugin(o_auth => $conf->{oauth});
+	$self->plugin(mail   => {
 		from => $conf->{mail}->{from},
 		type => 'text/html',
 	});
 	
 	# helpers
 	
-	$self->plugin(  'api_helpers', {error_msg => {
-		21 => 'Bad session', 22 => 'Bad user',
-		41 => 'No signature', 44 => 'User not found',
-		50 => 'Inernal server error', 51 => 'Bad signature', 52 => 'Not found api_id',
+	$self->plugin('api_helpers', {error_msg => {
+		44 => 'User not found', 50 => 'Inernal server error', 51 => 'Bad signature',
 	}});
 	
 	$self->plugin( 'util_helpers');
@@ -53,7 +52,18 @@ sub startup {
 	
 	my $r = $self->routes;
 	
-	$r->route->to('index#main')->name('index');
+	# check user
+	
+	my $u = $r->bridge->to('user#check');
+	$u->route->to('index#main')->name('index');
+	
+	# oauth
+	
+	$r->route('/login/:provider')->to('user-provider#oauth_session')->name('login');
+	
+	$r->route('/oauth/error'    )->to('user-provider#oauth_error');
+	$r->route('/oauth/redirect' )->to('user-provider#oauth_redirect');
+	$r->route('/oauth/:provider')->to('user-provider#oauth');
 	
 	# admin
 	
@@ -69,15 +79,21 @@ sub startup {
 
 	# api
 	
-	my $api  = $r->route('/api')->to('api#', api => 1);
+	my $api = $r->route('/api')->to('api#', api => 1);
+	$api->route('/test')->to('api#hello');
 	
-	my $apis = $api->bridge->to('#sign', sign => 1);
-	$apis->route('/test')->to('api#hello');
+	my $apiu = $api->bridge->to('#auth');
+	$apiu->route('/user')->get->to('api-user#profile');
 	
-	# my $apiu = $apis->bridge->to('#auth');
-	# $apiu->route('/session')->to('api-user#new_session');
+	$apiu->route('/event')->get->to('api-event#list');
+	$apiu->route('/event/create')->post->to('api-event#create');
 	
-	$api->bridge('/')->to('#sign', maybe => 1, sign => 0)->route->to('#hello');
+	my $apie = $apiu->bridge('/event/:id', id => qr/\d+/)->to('api-event#check');
+	$apie->get ->to('api-event#item');
+	$apie->post->to('api-event#update');
+	$apie->post->to('api-event#remove');
+	
+	$api->route->to('#hello');
 	$api->route ('/(*any)')->to('#any');
 	
 	$self->hook(after_dispatch => sub {

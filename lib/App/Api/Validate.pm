@@ -3,18 +3,20 @@ use App::Base -controller;
 
 # XXX: need Validate engine
 
-sub user_signup {
+sub event_create {
 	my $self  = shift;
 	my $error = {
-		(map { $_ => 'empty'     } grep { !$self->req->param($_) } qw(name phone udid app_version os os_version)),
-		(map { $_ => 'incorrect' } grep {  $self->req->param($_) && $self->req->param($_) !~ /^[A-Za-zА-Яа-я\- ]+$/ } 'name'),
-		(map { $_ => 'incorrect' } grep {  $self->req->param($_) && $self->req->param($_) !~ /^\+?\d{10,13}$/ } 'phone'),
+		(map { $_ => 'empty'     } grep { !$self->req->param($_) } qw(start_date end_date providers)),
+		(map { $_ => 'incorrect' } grep {  $self->req->param($_) && $self->req->param($_) !~ /^\d{4}-\d{2}-\d{2}/ } qw(start_date end_date)),
 	};
 	
 	if (%$error) {
 		$self->stash(error => $error);
 		return;
 	}
+	
+	my $end = $self->req->param('end_date');
+	$self->req->param(end_date => "$end 23:59:59") unless $end =~ /:/;
 	
 	return 1;
 }

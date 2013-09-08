@@ -13,47 +13,23 @@ sub hello { shift->render('json', { hello => 'EventShot' }) }
 
 #
 
-sub sign {
-	my $self = shift;
-	
-	if ( !$self->req->param('dev103') && $self->stash('sign') ) {
-		$self->api_error(code => 4, subcode => 41), return 0
-			unless $self->check_sign;
-	}
-	else {
-		$self->stash(api_id => $self->api_id);
-	}
-	
-	return 1;
-}
-
 sub auth {
 	my $self = shift;
 	
-	# for test mode
+	$self->api_error(code => 2), return
+		unless my $uuid = $self->_get_auth
+	;
 	
-	my $s;
-	if ($self->req->param('dev103') && $self->req->param('user_id')) {
-		$s->{user_id} = $self->req->param('user_id');
-	}
-	
-	if (!$s) {
-		$self->api_error(code => 2), return
-			unless my $auth = $self->_get_auth;
-		
-		$self->api_error(code => 2, subcode => 21), return
-			unless $s = $self->db->select('select * from session where sid=? limit 1', $auth)->[0];
-	}
-	
-	# user must be verify
-	$self->api_error(code => 2, subcode => 22), return
-		unless my $u = $self->db->select('select * from user where id=? and verify=1 limit 1', $s->{user_id})->[0];
+	$self->api_error(code => 4, subcode => 44), return
+		unless my $u = $self->dw->user(
+			$self->db->select('select * from user where uuid=? limit 1', $uuid)
+		)->[0]
+	;
 	
 	# actived
 	{
 		$self->db->query('update user set actived=now() where id=?', $u->{id});
 		$u->{actived} = $self->u('time2iso');
-		$u->{session} = $s;
 	}
 	
 	$self->stash(USER => $u);
@@ -99,7 +75,7 @@ sub check_sign {
 
 sub _get_auth {
 	my $self = shift;
-	$self->req->headers->header('X-Session-Auth') || $self->req->param('auth') || '';
+	$self->req->param('uuid') || $self->get_cookie('uuid');
 }
 
 sub _error {

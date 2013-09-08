@@ -20,52 +20,13 @@ note 'Check base methods...';
 
 $t->get_ok("$url/")
   ->status_is(200)
-  ->header_is('Access-Control-Allow-Origin', '*')
-  ->json_is({hello => 'Security Video'})
+  # ->header_is('Access-Control-Allow-Origin', '*')
+  ->json_is({hello => 'EventShot'})
 ;
 
 $t->get_ok("$url/foobar")
   ->status_is(200)
   ->content_is(q({"error":{"msg":"Bad request","code":5}}))
-;
-
-# check sign
-
-note 'Check sign...';
-
-$t->get_ok("$url/test")
-  ->status_is(200)
-  ->content_is(q({"error":{"subcode":41,"msg":"Bad parameters","submsg":"No signature","code":4}}))
-;
-
-$t->get_ok("$url/test?api_id")
-  ->status_is(200)
-  ->content_is(q({"error":{"subcode":41,"msg":"Bad parameters","submsg":"No signature","code":4}}))
-;
-
-$t->get_ok("$url/test?api_id=1&sign=foobar")
-  ->status_is(200)
-  ->content_is(q({"error":{"subcode":41,"msg":"Bad parameters","submsg":"No signature","code":4}}))
-;
-
-$t->get_ok(sign get => '/test')
-  ->status_is(200)
-  ->json_is({hello => 'Security Video'})
-;
-
-$t->get_ok(sign get => '/test?api_id=sdsdsdsd')
-  ->status_is(200)
-  ->content_is(q({"error":{"subcode":41,"msg":"Bad parameters","submsg":"No signature","code":4}}))
-;
-
-$t->get_ok(sign get => '/test?api_id=3')
-  ->status_is(200)
-  ->content_is(q({"error":{"subcode":41,"msg":"Bad parameters","submsg":"No signature","code":4}}))
-;
-
-$t->get_ok(sign get => '/test?api_id=2')
-  ->status_is(200)
-  ->json_is({hello => 'Security Video'})
 ;
 
 done_testing;

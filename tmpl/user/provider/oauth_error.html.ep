@@ -1,0 +1,5 @@
+% layout 'default', title => 'Login error', simple => 1;
+
+<p>Login error.<br/>Try again later.</p>
+
+<p><a href="/">Back</a></p>

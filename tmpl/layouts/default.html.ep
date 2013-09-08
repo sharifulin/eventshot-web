@@ -9,5 +9,16 @@
 </head>
 <body>
 	%== content
+	
+	<script src="http://code.jquery.com/jquery-1.10.1.min.js"></script>
+	<script src="http://code.jquery.com/jquery-migrate-1.2.1.min.js"></script>
+	<script>
+		$('.open_modal').live('click', function(){
+			var width = 800;
+			var height = 600;
+			window.open($(this).attr('href'), 'oauth', 'scrollbars=0, resizable=1, menubar=0, left=' + (screen.width - width) / 2 + ', top=' + (screen.height - height) / 2 + ', width=' + width + ', height=' + height + ', toolbar=0, status=0');
+			return false;
+		});
+	</script>
 </body>
 </html>

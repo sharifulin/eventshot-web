@@ -34,7 +34,7 @@ sub check_user {
 sub index {
 	my $self = shift;
 	# XXX: support ?redirect_url=... after login
-	$self->redirect_to('admin_user');
+	$self->redirect_to('admin_admin');
 }
 
 sub login {

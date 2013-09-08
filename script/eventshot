@@ -5,6 +5,7 @@ use lib qw(lib /tk/lib /tk/mojo4/lib);
 BEGIN {
 	# DEV
 	# $ENV{DBI_UTIL_DEBUG}++;
+	# $ENV{OAUTH_DEBUG}++;
 	
 	$ENV{DEV}++; # if qx(pwd) =~ /dev/;
 	$ENV{MOJO_MODE} ||= $ENV{DEV} ? 'dev' : 'production';
@@ -14,3 +15,4 @@ BEGIN {
 
 # use Devel::SimpleTrace;
 require Mojolicious::Commands; Mojolicious::Commands->start_app('App');
+# 

@@ -1,5 +1,20 @@
 % layout 'default', title => 'EventShot';
+% my $U = stash('USER') || {};
 
 <div style="text-align:center">
 	<img src="/logo.jpg" alt="eventshot">
 </div>
+
+<br><br>
+
+<ol>
+% for (@$providers) {
+<li>
+	% if (my $p = $U->{provider}->{$_->[0]}) {
+	Logged to <%= $_->[1] %> (<a href="<%= $p->{link} || '#' %>" target="_blank"><%= $p->{name} %></a>)
+	% } else {
+	<a href="/login/<%= $_->[0] %>" class="open_modal">Sign in with <%= $_->[1] %></a>
+	% }
+</li>
+% }
+</ol>
