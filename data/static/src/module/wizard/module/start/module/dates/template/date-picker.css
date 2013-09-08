@@ -1,0 +1,42 @@
+#app-wizard-start-date-picker
+{
+  padding: 5px;
+}
+#app-wizard-start-date-picker .Basis-Calendar
+{
+  width: 270px;
+}
+#app-wizard-start-date-picker .Basis-Calendar-Header,
+#app-wizard-start-date-picker .Basis-Calendar-Footer
+{
+  display: none;
+}
+#app-wizard-start-date-picker .Basis-Calendar-Body
+{
+  border: none;
+  font-size: 16px;
+  width: auto;
+  height: 290px;
+}
+#app-wizard-start-date-picker .Basis-Calendar-SectionContent
+{
+  border: none;
+  height: auto;
+}
+#app-wizard-start-date-picker .Basis-Calendar-Node
+{
+  width: 40px;
+  padding: 10px 0;
+  background: white;
+}
+#app-wizard-start-date-picker .Basis-Calendar-Node.disabled,
+#app-wizard-start-date-picker .Basis-Calendar-Node.disabled:hover
+{
+  background: none !important;
+  color: #CCC !important;
+}
+#app-wizard-start-date-picker .Basis-Calendar-MonthWeekDays-Day
+{
+  width: 40px;
+  padding: 10px 0;
+}

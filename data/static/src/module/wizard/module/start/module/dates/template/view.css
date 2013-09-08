@@ -1,4 +1,14 @@
 .app-wizard-start-dates
 {
-
+  text-align: center;
+}
+.app-wizard-start-dates_date-buttons
+{
+  padding: 1em 0;
+}
+.app-wizard-start-dates_date-button
+{
+  font-size: 180%;
+  padding: .4em 20px;
+  margin: 0 10px;
 }
