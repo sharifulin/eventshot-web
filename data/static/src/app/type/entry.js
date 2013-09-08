@@ -9,7 +9,9 @@ var Entry = basis.entity.createType('Entry', {
   id: basis.entity.IntId,
   source: String,
   type: String,
-  content: basis.fn.$self
+  data: function(value){
+    return value || '';
+  }
 });
 
 

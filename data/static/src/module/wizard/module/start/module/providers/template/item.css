@@ -1,4 +1,38 @@
 .app-wizard-start-providers-item
 {
-
+  cursor: pointer;
+  display: inline-block;
+  margin: 10px 25px;
+  position: relative;
+}
+.app-wizard-start-providers-item__unchecked
+{
+  -webkit-filter: grayscale();
+  opacity: 0.5;
+}
+.app-wizard-start-providers-item:hover
+{
+  opacity: .75;
+}
+.app-wizard-start-providers-item_image
+{
+  width: 96px;
+  height: 96px;
+  position: relative;
+  z-index: 10;
+}
+.app-wizard-start-providers-item_title
+{
+  position: absolute;
+  z-index: 0;
+  width: 100%;
+  top: 100%;
+  opacity: 1;
+  -webkit-transition-duration: .1s;
+  -webkit-transition-property: top, opacity;
+}
+.app-wizard-start-providers-item_title__unchecked
+{
+  top: 50%;
+  opacity: 0;
 }

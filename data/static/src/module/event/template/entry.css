@@ -1,6 +1,11 @@
 .app-event-entry
 {
-  border: 1px solid #E0E0E0;
   margin: 5px;
   padding: 5px;
+}
+
+.app-event-entry_source-icon
+{
+  float: left;
+  margin-right: 8px;
 }

@@ -1,0 +1,10 @@
+{
+  "id": 123,
+  "startDate": "2013-09-01",
+  "endDate": "2013-09-08",
+  "status": 0,
+  "providers": [
+    "facebook",
+    "twitter"
+  ]
+}

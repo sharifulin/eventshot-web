@@ -1,4 +1,10 @@
 .app-wizard-start
 {
-
+  text-align: center;
+}
+.app-wizard-start_create-button
+{
+  font-size: 180%;
+  padding: .4em 20px;
+  margin: 2em 0 .5em;
 }

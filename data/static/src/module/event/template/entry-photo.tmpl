@@ -1,7 +1,11 @@
 <b:style src="entry-photo.css"/>
+<b:define name="title" type="bool"/>
 
 <b:include src="entry.tmpl" class="app-event-entry-photo">
   <b:replace ref="content">
-    <img src="{content}" height="100"/>
+    <div class="app-event-entry-photo_photo-card">
+      <img class="app-event-entry-photo_image" src="{url}" height="100"/>
+      <div class="app-event-entry-photo_title app-event-entry-photo_title__{title}">{title}</div>
+    </div>
   </b:replace>
 </div>

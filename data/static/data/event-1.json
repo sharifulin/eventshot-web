@@ -1,21 +1,32 @@
 {
-  id: 1,
-  title: 'Foo bar',
-  startDate: '2013-09-01',
-  endDate: '2013-09-15',
-  description: 'Lorem ipsum ...',
-  entries: [
+  "id": 1,
+  "title": "Foo bar",
+  "startDate": "2013-09-01",
+  "endDate": "2013-09-15",
+  "description": "Lorem ipsum ...",
+  "status": 100,
+  "providers": [
+    "instagram",
+    "facebook"
+  ],
+  "entries": [
     {
-      id: 1,
-      source: 'instagram',
-      type: 'photo',
-      content: 'http://eventshot.me/logo.jpg'
+      "id": 1,
+      "source": "instagram",
+      "type": "photo",
+      "data": {
+        "title": "Lorem...",
+        "url": "http://eventshot.me/logo.jpg"
+      }
     },
     {
-      id: 2,
-      source: 'instagram',
-      type: 'photo',
-      content: 'http://eventshot.me/logo.jpg'
+      "id": 2,
+      "source": "facebook",
+      "type": "photo",
+      "data": {
+        "title": "Lorem...",
+        "url": "http://eventshot.me/logo.jpg"
+      }
     }
   ]
 }

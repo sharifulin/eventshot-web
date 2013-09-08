@@ -1,12 +1,18 @@
 .app-wizard-page
 {
-  border: 5px solid red;
+  padding: 5px;
+  overflow: hidden;
+  -webkit-transition-property: opacity, height;
+  opacity: 1;
 }
 .app-wizard-page__selected
 {
+  -webkit-transition-duration: 1s, .25s;  
   border-color: green;
 }
 .app-wizard-page__unselected
 {
-  display: none;
+  -webkit-transition-duration: .35s;
+  -webkit-transition-function: ease-in-out;
+  opacity: 0.5;
 }

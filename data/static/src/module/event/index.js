@@ -5,7 +5,7 @@ var EntryNode = new basis.ui.Node.subclass({
   template: resource('template/entry.tmpl'),
   binding: {
     source: 'data:',
-    content: 'data:'
+    content: 'data:data'
   }
 });
 
@@ -18,6 +18,8 @@ var entryViews = {
   photo: EntryNode.subclass({
     template: resource('template/entry-photo.tmpl'),
     binding: {
+      url: 'data:data.url',
+      title: 'data:data.title'
     }
   })
 };
@@ -38,6 +40,7 @@ var view = new basis.ui.Node({
         }
       },
 
+      sorting: 'data.id',
       childClass: EntryNode,
       childFactory: function(config){
         var ItemClass = entryViews[config.delegate.data.type] || EntryNode;
