@@ -6,7 +6,8 @@ Please close this window and refresh main window.
 	% if (my $url = stash('url') || param('url')) {
 		window.opener.location.href = '<%= $url %>';
 	% } else {
-		window.opener.location.reload();
+		opener.postMessage('updateProviderList', '*');
+		// window.opener.location.reload();
 	% }
 	}
 	window.close();
