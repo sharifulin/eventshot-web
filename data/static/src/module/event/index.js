@@ -156,6 +156,7 @@ var view = new basis.ui.Node({
           {
             var id = this.data.id;
             basis.net.request({
+              r: 1,
               method: 'POST',
               params: {
                 description: this.data.description
