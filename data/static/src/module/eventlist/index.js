@@ -26,7 +26,7 @@ module.exports = new basis.ui.Node({
     }
   },
 
-  dataSource: app.type.Event.all,
+  dataSource: app.type.Event.inited,
   active: true,
   
   sorting: 'data.id',

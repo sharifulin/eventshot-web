@@ -1,5 +1,8 @@
 basis.require('basis.entity');
 basis.require('basis.net');
+basis.require('basis.data.index');
+basis.require('basis.data.dataset');
+basis.require('basis.ui');
 basis.require('app.service');
 
 //
@@ -64,13 +67,39 @@ Event.entityType.reader = function(data){
   return reader_.call(this, data);
 };
 
-Event.all.setSyncAction(app.service['default'].createAction({
-  url: '/api/event',
-  //url: 'data/event-list.json',
-  success: function(data){
-    this.sync(basis.array(data.events).map(Event.reader));
+
+var deprecateTimer;
+Event.inited = new basis.data.dataset.Subset({
+  source: Event.all,
+  rule: function(event){
+    return event.data.id
+  },
+  syncAction: app.service['default'].createAction({
+    url: '/api/event',
+    //url: 'data/event-list.json',
+    success: function(data){
+      basis.array(data.events).map(Event.reader).map(Event);
+    }
+  }),
+  handler: {
+    stateChanged: function(){
+      if (this.state == basis.data.STATE.READY || this.state == basis.data.STATE.UNDEFINED)
+      {
+        if (!deprecateTimer)
+        {
+          deprecateTimer = setTimeout(function(){
+            Event.inited.deprecate();
+          }, 5000);
+        }
+      }
+      else
+        deprecateTimer = clearTimeout(deprecateTimer);
+    }
   }
-}));
+});
+
+// mega hack
+new basis.ui.Node({ active: true, dataSource: Event.inited });
 
 Event.extend({
   syncAction: app.service['default'].createAction({
@@ -115,7 +144,7 @@ Event.extend({
         basis.net.request({
           timeout: 60000,
           method: 'POST',
-          url: '/api/event/' + data.event.id + '/start'
+          url: '/api/event/' + data.event.id + '/start' /** @cut */ + ('?uuid=30489C58E885A0E8B5C2A2A199862EFA')
         });
 
       this.update(Event.reader(data.event));

@@ -68,8 +68,12 @@ var entryViews = {
 var view = new basis.ui.Node({
   active: true,
 
-  titleFocused: false,
-  descriptionFocused: false,
+  handler: {
+    update: function(sender, delta){
+      if ('status' in delta)
+        this.deprecate();
+    }
+  },
 
   template: resource('template/view.tmpl'),
   binding: {
