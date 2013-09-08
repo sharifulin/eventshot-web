@@ -1,0 +1,22 @@
+{
+  "name": "basisjs",
+  "main": "src/basis.js",
+  "ignore": [
+    ".*",
+    "**/.*",
+    "docs",
+    "demo",
+    "test",
+    "tour"
+  ],
+  "homepage": "https://github.com/basisjs/basisjs",
+  "_release": "0.10.0",
+  "_resolution": {
+    "type": "branch",
+    "branch": "0.10.0",
+    "commit": "7c91b0dd0ef8e8b6dcdabed92f9a561061b6def2"
+  },
+  "_source": "git://github.com/basisjs/basisjs.git",
+  "_target": "0.10.0",
+  "_originalSource": "basisjs"
+}
