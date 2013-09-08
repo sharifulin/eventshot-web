@@ -52,7 +52,6 @@ for (@$queue) {
             }
         }
         when (/instagram/) {
-            say "$user_id $event_id $auth->{access_token}";
             my $images = $ua->get("https://api.instagram.com/v1/users/self/media/recent/" => form => { min_timestamp => $min_timestamp, access_token => $auth->{access_token} })->res->json;
 
             for (@{ $images->{data} }) {
@@ -71,8 +70,10 @@ for (@$queue) {
 			my $data = $nt->verify_credentials;
 
 		    #my $list = $nt->user_timeline(count => 200, trim_user => 1);
-		    my $list = $nt->user_timeline();
-            say ref $list;
+		    my $tweets = $nt->user_timeline();
+            for (@$tweets) {
+                say Dumper($_);
+            }
         }
         default {}
     };
