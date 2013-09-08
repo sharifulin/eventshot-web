@@ -58,6 +58,16 @@ sub create {
 	$self->render('json', {event => $self->_item(undef, 'no_entries,no_main')});
 }
 
+sub start {
+	my $self = shift;
+	my $item = $self->stash('item');
+	
+	warn qx(cd script/data; ./find_items.pl);
+	
+	$self->check;
+	$self->render('json', {event => $self->_item});
+}
+
 sub update {
 	my $self = shift;
 	my $item = $self->stash('item');
@@ -90,14 +100,19 @@ sub _item {
 	my $item = shift || $self->stash('item') || return;
 	my $flag = shift || '';
 	
+	my $f = $self->req->param('provider');
 	my $e =  [
 		sort { $a->{data}->{created} cmp $b->{data}->{created} }
-		map { +{
-			id     => $_->{id},
-			source => $_->{type},
-			type   => $_->{data} =~ /photo'\s*=>\s*'http/ ? 'photo' : 'text',
-			data   => eval $_->{data},
-		} }
+		map { 
+			my $h = {
+				id     => $_->{id},
+				source => $_->{type},
+				type   => $_->{data} =~ /photo'\s*=>\s*'http/ ? 'photo' : 'text',
+				data   => eval $_->{data},
+			};
+			
+			$f ? $f eq $_->{type} ? $h : () : $h;
+		}
 		@{ $item->{items}||[] }
 	];
 	
@@ -109,7 +124,7 @@ sub _item {
 		providers => [ map $_->{type}, @{$item->{queues}||[]} ],
 		
 		# XXX
-		progress  => 1 + int rand 100,
+		progress  => {wait => 10, progress => '30', ready => '100', error => '0'}->{$item->{status}} || 1 + int rand 100,
 		
 		$flag !~ /no_entries/ ? (entries    => $e) : (),
 		$flag !~ /no_main/    ? (main_entry => [grep $_->{type} eq 'photo', @$e]->[0]) : (),

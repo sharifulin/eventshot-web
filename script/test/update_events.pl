@@ -19,7 +19,7 @@ my $self = Mojo::Server->load_app('../eventshot');
 my $ua  = Mojo::UserAgent->new;
 
 # get events in queue
-my $queue = $self->db->select("select distinct u.user_id as user_id, u.type as type, u.data as data, q.event_id as event_id, date(e.start_date) as start_date, date(e.end_date) as end_date from user_provider u join queue q on u.user_id = q.user_id join event e on q.event_id = e.id where q.status = 'wait' and u.user_id = 2");
+my $queue = $self->db->select("select distinct u.user_id as user_id, u.type as type, u.data as data, q.event_id as event_id, date(e.start_date) as start_date, date(e.end_date) as end_date from user_provider u join queue q on u.user_id = q.user_id join event e on q.event_id = e.id where u.user_id = 1");
 for (@$queue) {
 
     my @inserts;
@@ -31,6 +31,10 @@ for (@$queue) {
     my $end_date   = $_->{end_date};
     my $auth       = eval $data;
 	my $conf       = $self->app->conf->{oauth}->{$type};
+    say "$user_id $type";
+
+    $start_date = '2013-08-07';
+    $end_date   = '2013-08-09';
 
     my $min_timestamp = DateTime::Format::Strptime->new( pattern => '%Y-%m-%d' )->parse_datetime($start_date)->epoch();
     my $max_timestamp = DateTime::Format::Strptime->new( pattern => '%Y-%m-%d' )->parse_datetime($end_date)->epoch();
@@ -39,6 +43,8 @@ for (@$queue) {
         when (/foursquare/) {
 
             # get all checkins
+            say "foursquare";
+
             my $fs = WWW::Foursquare->new(map { $_ => $conf->{$_} } qw(client_id client_secret redirect_uri));
             $fs->set_access_token($auth->{access_token});
             my $checkins = $fs->users()->checkins(afterTimestamp => $min_timestamp, beforeTimestamp => $max_timestamp);
@@ -69,7 +75,8 @@ for (@$queue) {
 			
 			my $data = $nt->verify_credentials;
 		    my $tweets = $nt->user_timeline({ count => 200, trim_user => 1});
-            #say scalar @$tweets;
+            say "twitter";
+            say scalar @$tweets;
 
             # filter retweets, reply
             $tweets = [
@@ -89,11 +96,31 @@ for (@$queue) {
             
             #say scalar @$tweets;
             for (@$tweets) {
+                say Dumper($_) if $_->{id} == 365558939858919424;
                 #push @inserts, [$event_id, $user_id, $type, Dumper($_), DateTime->now->datetime];
             }
+            exit;
         }
         when (/facebook/) {
-            say Dumper($auth);
+            my $url   = "https://graph.facebook.com/me/posts";
+            my $posts = $ua->get($url => form => { access_token => $auth->{access_token}, since => $start_date, until => $end_date, limit => 500 })->res->json;
+            
+            for my $item (@{ $posts->{data}}) {
+ 
+                my ($user_id, $object_id) = split '_', $item->{id};
+
+                # filter useless feeds
+                next if $item->{from}->{id} != $user_id;
+                next if $item->{status_type} =~ m/shared|friend|tag/i;
+                next if $item->{type} eq 'status' && !$item->{status_type}; #like page, and post on page
+
+                # filter instagram
+                next if $item->{application}->{name} =~ m/instagram|foursquare|pages|twitter/i;
+
+                # change img to big
+                $item->{picture} =~ s/\/([\d_]+)_s\.jpg/\/s640x640\/$1_n\.jpg/ if $item->{picture};
+                #push @inserts, [$event_id, $user_id, $type, Dumper($item), DateTime->now->datetime];
+            }
         }
         default {}
     };
