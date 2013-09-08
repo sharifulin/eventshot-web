@@ -1017,12 +1017,15 @@
   * Special processing options:
   * - autoload: namespace that must be loaded right after core loaded
   * - path: dictionary of paths for root namespaces
+  * - extClass: extend buildin classes (Object, Array, String, )
   *
   * Other options copy into basis.config as is.
   */
   var config = (function(){
     var basisBaseURI = '';
-    var config = {};
+    var config = {
+      extClass: true
+    };
 
     if (NODE_ENV)
     {
@@ -1044,10 +1047,6 @@
           } catch (e) {
             ;;;consoleMethods.error('basis.js config parse fault: ' + e);
           }
-
-          // @cut warn about extClass in basis-config, this option was introduced in 0.9.8 for preventing using custom methods via buildin clasess
-          // TODO: remove this warning in later versions
-          /** @cut */ if ('extClass' in config) consoleMethods.warn('extClass option in basis-config is not required, basis.js doesn\'t extend buildin classes by custom methods any more');
 
           basisFilename = pathUtils.normalize(scriptEl.src)
           basisBaseURI = pathUtils.dirname(basisFilename);
@@ -1104,9 +1103,10 @@
   *   var fooBarNamespace = basis.namespace('foo.bar');
   * @name namespace
   * @param {string} path
+  * @param {function()} wrapFunction Deprecated.
   * @return {basis.Namespace}
   */
-  var getNamespace = function(path){
+  var getNamespace = function(path, wrapFunction){
     var cursor = global;
     var nsRoot;
 
@@ -1118,13 +1118,22 @@
         var nspath = path.slice(0, i + 1).join('.');
 
         // create new namespace
-        cursor[name] = (function(path){
+        cursor[name] = (function(path, wrapFn){
+         /**
+          * @returns {*|undefined}
+          */
+          function namespace_(){
+            if (wrapFunction)
+              return wrapFunction.apply(this, arguments);
+          }
+
+          var wrapFunction = typeof wrapFn == 'function' ? wrapFn : null;
           var pathFn = function(name){
             return path + (name ? '.' + name : '');
           };
           pathFn.toString = $const(path);
 
-          return {
+          return extend(namespace_, {
             path: pathFn,
             exports: {
               path: pathFn
@@ -1133,9 +1142,16 @@
             extend: function(names){
               extend(this.exports, names);
               return complete(this, names);
+            },
+            setWrapper: function(wrapFn){
+              if (typeof wrapFn == 'function')
+              {
+                ;;;if (wrapFunction) consoleMethods.warn('Wrapper for ' + path + ' is already set. Probably mistake here.');
+                wrapFunction = wrapFn;
+              }
             }
-          };
-        })(nspath);
+          });
+        })(nspath, i < path.length ? wrapFunction : null);
 
         if (nsRoot)
           nsRoot.namespaces_[nspath] = cursor[name];
@@ -1526,7 +1542,7 @@
     // export names
     //
 
-    return extend(BaseClass.create, {
+    return getNamespace(namespace, BaseClass.create).extend({
       SELF: SELF,
       BaseClass: BaseClass,
       create: BaseClass.create,
@@ -2996,6 +3012,21 @@
 
   // TODO: rename path->stmElse and add path to exports
   basis.path = pathUtils;
+
+
+  //
+  // basis extenstions
+  //
+
+  if (config.extClass)
+  {
+    /** @cut */ consoleMethods.warn('Extension of build classes by custom functions (i.e. Object.*, Array.*, String.*, Function.*) is deprecated, but extends by default until 0.10 version; use `extClass: false` in basis.js config to prevent buildin class extenstion and make code ready to new basis.js versions');
+
+    extend(Object, basis.object);
+    extend(Function, basis.fn);
+    extend(Array, basis.array);
+    extend(String, basis.string);
+  }
 
 
   //

@@ -1,5 +1,6 @@
 {
   "name": "basisjs",
+  "version": "0.9.9",
   "main": "src/basis.js",
   "ignore": [
     ".*",
@@ -10,13 +11,13 @@
     "tour"
   ],
   "homepage": "https://github.com/basisjs/basisjs",
-  "_release": "0.10.0",
+  "_release": "0.9.9",
   "_resolution": {
-    "type": "branch",
-    "branch": "0.10.0",
-    "commit": "7c91b0dd0ef8e8b6dcdabed92f9a561061b6def2"
+    "type": "version",
+    "tag": "0.9.9",
+    "commit": "4e2f9f20ff3de4f52a44529abf273def31671b0b"
   },
   "_source": "git://github.com/basisjs/basisjs.git",
-  "_target": "0.10.0",
+  "_target": "0.9.9",
   "_originalSource": "basisjs"
 }

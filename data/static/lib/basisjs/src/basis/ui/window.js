@@ -37,14 +37,17 @@
   // definitions
   //
 
-  var dict = basis.l10n.dictionary(__filename);
-
   var templates = basis.template.define(namespace, {
     Blocker: resource('templates/window/Blocker.tmpl'),
     Window: resource('templates/window/Window.tmpl'),
     TitleButton: resource('templates/window/TitleButton.tmpl'),
     ButtonPanel: resource('templates/window/ButtonPanel.tmpl'),
     windowManager: resource('templates/window/windowManager.tmpl')
+  });
+
+  basis.l10n.createDictionary(namespace, __dirname + 'l10n/window', {
+    "emptyTitle": "[no title]",
+    "closeButton": "Close"
   });
 
 
@@ -94,6 +97,13 @@
     start: function(){
       this.autocenter = false;
       this.element.style.margin = 0;
+    },
+    over: function(){
+      this.cssRule.setStyle(basis.object.slice(this.element.style, ['left', 'top']));
+      cssom.setStyle(this.element, {
+        top: '',
+        left: ''
+      });
     }
   };
 
@@ -117,7 +127,7 @@
     moveable: true,
     zIndex: 0,
 
-    title: dict.token('emptyTitle'),
+    title: basis.l10n.token(namespace, 'emptyTitle'),
 
     template: templates.Window,
     binding: {
@@ -133,16 +143,16 @@
         this.activate();
       },
       keydown: function(event){
-        switch (event.key)
+        switch (Event.key(event))
         {
-          case event.KEY.ESCAPE:
+          case Event.KEY.ESCAPE:
             if (this.closeOnEscape)
               this.close();
             break;
 
-          case event.KEY.ENTER:
-            if (event.sender.tagName != 'TEXTAREA')
-              event.die();
+          case Event.KEY.ENTER:
+            if (Event.sender(event).tagName != 'TEXTAREA')
+              Event.kill(event);
             break;
         }
       }
@@ -180,6 +190,9 @@
 
     init: function(){
       UINode.prototype.init.call(this);
+
+      // add generic rule
+      this.cssRule = cssom.uniqueRule();
 
       // make window moveable
       if (this.moveable)
@@ -224,37 +237,32 @@
       this.title = title;
       this.updateBind('title');
     },
-    templateSync: function(){
-      var style;
-      if (!this.autocenter && this.element.nodeType == 1)
-        style = basis.object.slice(this.element.style, ['left', 'top', 'margin']);
+    templateSync: function(noRecreate){
+      UINode.prototype.templateSync.call(this, noRecreate);
 
-      UINode.prototype.templateSync.call(this);
-
-      if (this.element.nodeType == 1)
+      if (this.element)
       {
-        if (style)
-          cssom.setStyle(this.element, style);
-
         if (this.dde)
           this.dde.setElement(this.element, this.tmpl.ddtrigger || (this.tmpl.title && this.tmpl.title.parentNode) || this.element);
 
         if (this.buttonPanel)
           DOM.insert(this.tmpl.content || this.element, this.buttonPanel.element);
-      }
 
-      this.realign();
+        cssom.classList(this.element).add(this.cssRule.token);
+
+        this.realign();
+      }
     },
     setZIndex: function(zIndex){
       this.zIndex = zIndex;
-      if (this.tmpl && this.element.style)
-        this.element.style.zIndex = zIndex;
+      this.element.style.zIndex = zIndex;
     },
     realign: function(){
       this.setZIndex(this.zIndex);
-      if (this.tmpl && this.autocenter)
+      if (this.autocenter)
       {
-        cssom.setStyle(this.element,
+        this.element.style.margin = '';
+        this.cssRule.setStyle(
           this.element.offsetWidth
             ? {
                 left: '50%',
@@ -264,8 +272,7 @@
               }
             : {
                 left: 0,
-                top: 0,
-                margin: 0
+                top: 0
               }
         );
       }
@@ -319,6 +326,9 @@
       }
 
       UINode.prototype.destroy.call(this);
+
+      this.cssRule.destroy();
+      this.cssRule = null;
     }
   });
 

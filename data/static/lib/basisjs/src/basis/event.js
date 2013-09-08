@@ -151,11 +151,16 @@
     */
     init: function(){
       if (this.handler && !this.handler.callbacks)
+      {
+        if (DEVMODE && 'handlerContext' in this)
+          basis.dev.warn(this.constructor.className + ': handlerContext is obsolete. Use # handler: { callbacks: {..}, context: <handlerContext> } # instead.');
+
         this.handler = {
           callbacks: this.handler,
           context: this,
           handler: null
         };
+      }
     },
 
    /**

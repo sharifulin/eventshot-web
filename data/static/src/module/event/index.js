@@ -20,6 +20,12 @@ var EntryNode = new basis.ui.Node.subclass({
   template: resource('template/entry.tmpl'),
   binding: {
     source: 'data:',
+    sourceImage: {
+      events: 'update',
+      getter: function(node){
+        return app.type.Provider.assets[node.data.source];
+      }
+    },
     content: 'data:data'
   }
 });

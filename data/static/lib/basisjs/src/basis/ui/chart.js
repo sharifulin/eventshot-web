@@ -1,7 +1,6 @@
 
   basis.require('basis.dom');
   basis.require('basis.dom.event');
-  basis.require('basis.layout');
   basis.require('basis.data');
   basis.require('basis.dom.wrapper');
   basis.require('basis.ui');
@@ -946,6 +945,7 @@
   //
   // ChartSelection
   // 
+  var ctrlPressed = false;
   var startItemPosition = -1;
   var addSelectionMode = true;
 
@@ -976,8 +976,13 @@
     }
     else
     {
-      for (var i = 0, item, pos; item = applyItems[i]; i++)
-        selectedItems.remove(item);
+      var pos;
+      for (var i = 0, item; item = applyItems[i]; i++)
+      {
+        pos = selectedItems.indexOf(item);
+        if (pos != -1)
+          selectedItems.splice(pos, 1); 
+      }      
     }
     
     return selectedItems;
@@ -994,31 +999,49 @@
         for (var eventName in CHART_SELECTION_GLOBAL_HANDLER)
           Event.addGlobalHandler(eventName, CHART_SELECTION_GLOBAL_HANDLER[eventName], this);
 
-        addSelectionMode = event.mouseLeft;
+        addSelectionMode = Event.mouseButton(event, Event.MOUSE_LEFT);
 
         var curItemPosition = getChartItemPositionByMouseX(chart, Event.mouseX(event));
-        startItemPosition = curItemPosition;
+        //if (/*!shiftPressed || */!startItemPosition)
+          startItemPosition = curItemPosition;
 
+        //lastItemPosition = curItemPosition;
         var selectedItems = rebuildChartSelection(chart, curItemPosition, startItemPosition);
 
-        if (!event.ctrlKey && !event.metaKey && addSelectionMode)
+        if (!ctrlPressed && addSelectionMode)
           chart.selection.clear();
 
         this.draw(selectedItems);
       }
 
-      chart.element.setAttribute('tabindex', 1);
-      chart.element.focus();
+      this.owner.element.setAttribute('tabindex', 1);
+      this.owner.element.focus();
       
-      event.die();
+      Event.kill(event);
     },
     contextmenu: function(event){
-      event.die();
+      Event.kill(event);
+    },
+    keydown: function(event){
+      if (Event.key(event) == Event.KEY.CTRL)
+        ctrlPressed = true;
+
+      /*if (Event.key(event) == Event.KEY.SHIFT)
+        shiftPressed = true;*/
+    },
+    keyup: function(event){
+      if (Event.key(event) == Event.KEY.CTRL)
+        ctrlPressed = false;
+
+      /*if (Event.key(event) == Event.KEY.SHIFT)
+        shiftPressed = false;*/
     },
     blur: function(){
       //lastItemPosition = -1;
       startItemPosition = -1;
       addSelectionMode = true;
+      ctrlPressed = false;
+      //shiftPressed = false;
     }
   };
 
@@ -1028,8 +1051,12 @@
       
       var curItemPosition = getChartItemPositionByMouseX(chart, Event.mouseX(event));
   
-      var selectedItems = rebuildChartSelection(chart, curItemPosition, startItemPosition);
-      this.draw(selectedItems);
+      /*if (curItemPosition != lastItemPosition)
+      {*/
+        //lastItemPosition = curItemPosition;
+        var selectedItems = rebuildChartSelection(chart, curItemPosition, startItemPosition);
+        this.draw(selectedItems);
+      //}
     },
     mouseup: function(event){
       var chart = this.owner; 
@@ -1043,8 +1070,8 @@
       };
       chart.selection.set(selectedItems);
 
-      for (var key in CHART_SELECTION_GLOBAL_HANDLER)
-        Event.removeGlobalHandler(key, CHART_SELECTION_GLOBAL_HANDLER[key], this);
+      for (var i in CHART_SELECTION_GLOBAL_HANDLER)
+        Event.removeGlobalHandler(i, CHART_SELECTION_GLOBAL_HANDLER[i], this);
     }
   };
 
@@ -1073,37 +1100,29 @@
         draw: function(){
           this.recalc();
           this.draw();
-        },
-        templateChanged: function(){
-          Event.addHandlers(this.owner.element, CHART_ELEMENT_HANDLER, this);
         }
       }
-    },
-
-    templateSync: function(){
-      AbstractCanvas.prototype.templateSync.call(this);
-
-      this.recalc();
-      Event.addHandlers(this.element, CHART_ELEMENT_HANDLER, this);
     },
 
     emit_ownerChanged: function(oldOwner){
       AbstractCanvas.prototype.emit_ownerChanged.call(this, oldOwner);
       
       if (oldOwner && oldOwner.selection)
+      {
         oldOwner.selection.removeHandler(CHART_SELECTION_HANDLER, this);
+        Event.removeHandlers(oldOwner.element, CHART_ELEMENT_HANDLER, this);
+      }
 
       if (this.owner && this.owner.selection)
       {
         this.recalc();
         this.owner.selection.addHandler(CHART_SELECTION_HANDLER, this);
+
+        Event.addHandlers(this.owner.element, CHART_ELEMENT_HANDLER, this);
       }
     },
 
     recalc: function(){
-      if (!this.context || !this.owner || !this.owner.context)
-        return;
-
       if (this.tmpl.canvas && this.owner.tmpl.canvas)
       {
         this.tmpl.canvas.width = this.owner.tmpl.canvas.width;
@@ -1114,9 +1133,6 @@
     },
 
     draw: function(selectedItems){
-      if (!this.context)
-        return;
-
       this.reset();
 
       this.context.save();
@@ -1172,8 +1188,8 @@
 
     action: {
       move: function(event){
-        this.mx = event.mouseX;
-        this.my = event.mouseY;
+        this.mx = Event.mouseX(event);
+        this.my = Event.mouseY(event);
 
         this.updatePosition(this.mx, this.my);
       },
@@ -1204,9 +1220,6 @@
     },
 
     recalc: function(){
-      if (!this.context)
-        return;
-
       if (this.tmpl.canvas && this.owner.tmpl.canvas)
       {
         this.tmpl.canvas.width = this.owner.tmpl.canvas.width;
@@ -1219,9 +1232,8 @@
 
     updatePosition: function(mx, my){
       this.reset();
-      this.recalc();
 
-      var canvasRect = new basis.layout.Box(this.element, false, this.owner.element.offsetParent);
+      var canvasRect = this.element.getBoundingClientRect();
       var x = mx - canvasRect.left - this.clientRect.left;
       var y = my - canvasRect.top - this.clientRect.top;
 
@@ -1233,9 +1245,6 @@
 
     draw: function(x, y){
       var context = this.context;
-
-      if (!context)
-        return;
 
       context.save();
       context.translate(this.clientRect.left, this.clientRect.top);
@@ -1472,9 +1481,6 @@
 
     draw: function(x, y){
       var context = this.context;
-
-      if (!context)
-        return;
 
       context.save();
       context.translate(this.clientRect.left, this.clientRect.top);

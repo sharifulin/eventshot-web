@@ -548,10 +548,11 @@
 
    /**
     * Fires when value was changed.
+    * @param {*} curValue Current value.
     * @param {*} oldValue Value before changes.
     * @event
     */
-    emit_change: createEvent('change', 'oldValue'),
+    emit_change: createEvent('change', 'curValue', 'oldValue'),
 
    /**
     * Actual value.
@@ -617,7 +618,7 @@
         this.value = newValue;
 
         if (!this.locked)
-          this.emit_change(oldValue);
+          this.emit_change(newValue, oldValue);
       }
 
       return changed;
@@ -652,7 +653,7 @@
 
         if (this.value !== this.lockedValue_)
         {
-          this.emit_change(this.lockedValue_);
+          this.emit_change(this.value, this.lockedValue_);
           this.lockedValue_ = null;
         }
       }
@@ -1432,14 +1433,6 @@
     },
 
    /**
-    * Proxy method for contained dataset. If no dataset, returns empty array.
-    * @return {Array.<basis.data.Object>}
-    */ 
-    getItems: function(){
-      return this.dataset ? this.dataset.getItems() : []
-    },
-
-   /**
     * @destructor
     */
     destroy: function(){
@@ -1454,7 +1447,7 @@
  /**
   * @class
   */
-  var AbstractDataset = Class(AbstractData, {
+  var AbstractDataset = Class(DataObject, {
     className: namespace('AbstractDataset'),
 
    /**
@@ -1987,6 +1980,16 @@
       ? value.map(wrapper)
       : wrapper(value);
   }
+
+
+  //
+  // namespace wrapper
+  //
+
+  module.setWrapper(function(value){
+    ;;;basis.dev.warn('using basis.data as function is deprecated now, use basis.data.wrapData instead');
+    return wrapData(value);
+  });
 
 
   //

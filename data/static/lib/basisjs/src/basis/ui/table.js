@@ -76,10 +76,18 @@
   var HeaderGroupingNode = Class(GroupingNode, {
     className: namespace + '.HeaderGroupingNode',
     emit_ownerChanged: function(oldOwner){
-      if (oldOwner && !this.owner)
+      if (oldOwner)
         DOM.remove(this.headerRow);
 
-      this.syncDomRefs();
+      if (this.owner && this.owner.element)
+      {
+        var cursor = this;
+        var element = this.owner.element;
+        do
+        {
+          DOM.insert(element, cursor.headerRow, DOM.INSERT_BEGIN);
+        } while (cursor = cursor.grouping);
+      }
       
       GroupingNode.prototype.emit_ownerChanged.call(this, oldOwner);
     },
@@ -131,7 +139,6 @@
     */
     init: function(){
       GroupingNode.prototype.init.call(this);
-      this.nullElement = DOM.createFragment();
       this.element = this.childNodesElement = this.headerRow = DOM.createElement('tr.Basis-Table-Header-GroupContent');
     },
 
@@ -155,35 +162,12 @@
       GroupingNode.prototype.removeChild.call(oldChild);
     },
 
-    syncDomRefs: function(){
-      var cursor = this;
-      var owner = this.owner;
-      var element = null;
-
-      if (owner)
-      {
-        element = (owner.tmpl && owner.tmpl.groupsElement) || owner.childNodesElement;
-        element.appendChild(this.nullElement);
-      }
-
-      do
-      {
-        cursor.element = cursor.childNodesElement = element;
-        if (element)
-          DOM.insert(element, cursor.headerRow, DOM.INSERT_BEGIN);
-      }
-      while (cursor = cursor.grouping);
-    },
-
    /**
     * @inheritDoc
     */
     destroy: function(){
       GroupingNode.prototype.destroy.call(this);
       this.headerRow = null;
-      this.element = null;
-      this.childNodesElement = null;
-      this.nullElement;
     }
   });
 

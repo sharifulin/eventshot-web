@@ -15,6 +15,9 @@ var view = new Menu({
     template: resource('template/cultureItem.tmpl'),
     binding: {
       title: 'title',
+      base: function(object){
+        return object.value == 'base';
+      },
       spriteX: {
         events: 'update',
         getter: function(object){
@@ -34,7 +37,7 @@ var view = new Menu({
       }
     }
   },
-  childNodes: basis.l10n.getCultureList().map(function(culture){
+  childNodes: ['base'].concat(basis.l10n.getCultureList()).map(function(culture){
     return {
       groupId: 'general',
       title: culture,
@@ -46,9 +49,9 @@ var view = new Menu({
 });
 
 basis.l10n.onCultureChange(function(culture){
-  var item = this.getChild(culture, 'value');
+  var item = view.getChild(culture, 'value');
   if (item)
     item.select();
-}, view, true);
+}, null, true);
 
 module.exports = view;

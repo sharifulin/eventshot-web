@@ -294,6 +294,21 @@
   }
 
  /**
+  * @deprecated use basis.cssom.display instead.
+  */
+  function show(element){
+    ;;;basis.dev.warn('basis.cssom.show is deprecated, use basis.cssom.display instead');
+    return display(element, true);
+  }
+ /**
+  * @deprecated use basis.cssom.display instead.
+  */
+  function hide(element){ 
+    ;;;basis.dev.warn('basis.cssom.hide is deprecated, use basis.cssom.display instead');
+    return display(element);
+  }
+
+ /**
   * Changes node visibility.
   * @param {Element} node
   * @param {boolean=} visible
@@ -303,6 +318,20 @@
     return setStyleProperty(node, 'visibility', visible ? '' : 'hidden');
   }
 
+ /**
+  * @deprecated use basis.cssom.visibility instead.
+  */
+  function visible(element){
+    ;;;basis.dev.warn('basis.cssom.visible is deprecated, use basis.cssom.visibility instead');
+    return visibility(element, true);
+  }
+ /**
+  * @deprecated use basis.cssom.visibility instead.
+  */
+  function invisible(element){
+    ;;;basis.dev.warn('basis.cssom.invisible is deprecated, use basis.cssom.visibility instead');
+    return visibility(element);
+  }
 
   //
   // classes
@@ -744,8 +773,6 @@
   * @class
   */
   var CssResource = Class(null, {
-    className: namespace + '.CssResource',
-
     inUse: 0,
 
     url: '',
@@ -911,6 +938,12 @@
     em: createUnitFormatter('em'),
     ex: createUnitFormatter('ex'),
     px: createUnitFormatter('px'),
-    percent: createUnitFormatter('%')
+    percent: createUnitFormatter('%'),
+
+    // deprecated
+    show: show,
+    hide: hide,
+    visible: visible,
+    invisible: invisible
   };
 

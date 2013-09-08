@@ -21,6 +21,12 @@ var view = new basis.ui.Node({
     template: resource('template/item.tmpl'),
     binding: {
       id: 'data:',
+      imageUrl: {
+        events: 'update',
+        getter: function(node){
+          return app.type.Provider.assets[node.data.id];
+        }
+      },
       title: 'data:',
       unchecked: checkedProviders.compute('update', function(node, value){
         return value.indexOf(node.data.id) == -1;

@@ -297,6 +297,11 @@
   // export names
   //
 
+  module.setWrapper(function(){
+    ;;;basis.dev.warn('using basis.crypt as function is deprecated now, use basis.crypt.wrap instead');
+    return wrap.apply(this, arguments);
+  });
+
   module.exports = {
     hex: hex,
     sha1: sha1,
@@ -304,3 +309,23 @@
 
     wrap: wrap
   };
+
+
+  // deprecated
+  basis.object.extend(module.exports, {
+    UTF16: basis.object.slice(UTF16),
+    UTF8: basis.object.slice(UTF8),
+    Base64: basis.object.slice(base64),
+    HEX: function(){
+      ;;;basis.dev.warn('basis.crypt.HEX is deprecated, use basis.crypt.hex instead');
+      return HEX.apply(this, arguments); 
+    },
+    SHA1: function(){
+      ;;;basis.dev.warn('basis.crypt.SHA1 is deprecated, use basis.crypt.sha1 instead');
+      return SHA1.apply(this, arguments);
+    }, 
+    MD5: function(){
+      ;;;basis.dev.warn('basis.crypt.MD5 is deprecated, use basis.crypt.md5 instead');
+      return MD5.apply(this, arguments);
+    }
+  });

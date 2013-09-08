@@ -19,10 +19,10 @@
 
   var Class = basis.Class;
   
-  var DataObject = basis.data.Object;
-  var KeyObjectMap = basis.data.KeyObjectMap;
-  var AbstractDataset = basis.data.AbstractDataset;
-  var DatasetWrapper = basis.data.DatasetWrapper;
+  var nsData = basis.data;
+  var DataObject = nsData.Object;
+  var KeyObjectMap = nsData.KeyObjectMap;
+  var AbstractDataset = nsData.AbstractDataset;
 
   var BindValue = basis.data.value.BindValue;
   var MapFilter = basis.data.dataset.MapFilter;
@@ -413,7 +413,7 @@
     return function(getter, events){
       var dataset;
 
-      if (getter instanceof AbstractDataset || getter instanceof DatasetWrapper)
+      if (getter instanceof AbstractDataset)
       {
         dataset = getter;
         getter = events;
@@ -533,7 +533,7 @@
   };
 
  //
- // getDatasetIndex/removeDatasetIndex
+ // 
  //
 
  var datasetIndexes = {};
@@ -580,7 +580,7 @@
 
  /**
   * @param {basis.data.AbstractDataset} dataset
-  * @param {basis.data.index.Index} index
+  * @param {basis.data.index.Index}
   */
   function removeDatasetIndex(dataset, index){
     var indexes = datasetIndexes[dataset.basisObjectId];
@@ -599,14 +599,29 @@
     }
   }
 
-
-  //
-  // IndexMap
-  //
-
  /**
-  * @class
+  * Extend for basis.data.AbstractDataset
+  * @namespace basis.data.AbstractDataset
   */
+  AbstractDataset.extend({
+   /**
+    * @param {basis.data.index.IndexConstructor}
+    */ 
+    getIndex: function(indexConstructor){
+      ;;;basis.dev.warn('basis.data.Dataset#getIndex is deprecated and will be removed soon, use basis.data.index.getDatasetIndex or basis.data.index.{indexName} functions instead');
+      return getDatasetIndex(this, indexConstructor);
+    },
+
+   /**
+    * @param {basis.data.index.Index}
+    */
+    deleteIndex: function(index){
+      ;;;basis.dev.warn('basis.data.Dataset#deleteIndex is deprecated and will be removed soon, use basis.data.index.removeDatasetIndex fucntion instead');
+      removeDatasetIndex(this, index);
+    }
+  });
+
+
   var CalcIndexPreset = Class(null, {
     extendConstructor_: true,
     indexes: {},
@@ -731,10 +746,10 @@
 
     listen: {
       index: {
-        change: function(sender){
+        change: function(sender, value){
           var indexMap = this.indexMap;
 
-          indexMap.indexValues[this.key] = sender.value;
+          indexMap.indexValues[this.key] = value;
           indexMap.indexUpdated = true;
           indexMap.recalcRequest();
         }

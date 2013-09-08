@@ -18,6 +18,13 @@ Provider.all.sync([
   { id: 'foursquare', title: 'Foursquare' }
 ]);
 
+Provider.assets = {
+  facebook: basis.asset('src/app/template/logos/facebook.png'),
+  instagram: basis.asset('src/app/template/logos/instagram.png'),
+  twitter: basis.asset('src/app/template/logos/twitter.png'),
+  foursquare: basis.asset('src/app/template/logos/foursquare.png')
+};
+
 //
 // export names
 //

@@ -55,8 +55,7 @@
 
   // dictionaries
   var tmplEventListeners = {};
-  var templates = {};
-
+  var tmplNodeMap = { seed: 1 };
   var namespaceURI = {
     svg: 'http://www.w3.org/2000/svg'
   };
@@ -77,225 +76,10 @@
   })();
 
 
-  var l10nTemplates = {};
-  function getL10nTemplate(token){
-    var template = basis.template.getL10nTemplate(token);
-    var id = template.templateId
-    var htmlTemplate = l10nTemplates[id];
-
-    if (!htmlTemplate)
-      htmlTemplate = l10nTemplates[id] = new HtmlTemplate(template.source);
-
-    return htmlTemplate;
-  }
-
-
-  //
-  // Constructs dom structure
-  //
-
- /**
-  * @func
-  */
-  function createEventHandler(attrName){
-    return function(event){
-      event = new domEvent.Event(event);
-
-      // don't process right click - generaly FF problem
-      if (event && event.type == 'click' && event.which == 3)
-        return;
-
-      var cursor = event.sender;
-      var attr;
-
-      // IE events may have no source, nothing to do in this case
-      if (!cursor)
-        return;
-
-      // search for nearest node with event-{eventName} attribute
-      do {
-        if (attr = (cursor.getAttributeNode && cursor.getAttributeNode(attrName)))
-          break;
-      } while (cursor = cursor.parentNode);
-
-      // if not found - exit
-      if (!cursor || !attr)
-        return;
-
-      // search for nearest node with basisTemplateId property
-      var refId;
-      var tmplRef;
-
-      do {
-        if (refId = cursor.basisTemplateId)
-        {
-          // if node found, return it
-          if (tmplRef = resolveInstanceById(refId))
-            break;
-        }
-      } while (cursor = cursor.parentNode);
-
-      if (tmplRef && tmplRef.action)
-      {
-        var actions = attr.nodeValue.qw();
-        event.actionTarget = cursor;
-        for (var i = 0, actionName; actionName = actions[i++];)
-          tmplRef.action.call(tmplRef.context, actionName, event);
-      }
-    };
-  }
-
-  function createEventTrigger(eventName){
-    return function(){
-      domEvent.fireEvent(document, eventName);
-    };
-  }
-
- /**
-  * Creates dom structure by declaration.
-  */
-  var buildHtml = function(tokens, parent){
-    function setEventAttribute(eventName, actions){
-      var attrName = 'event-' + eventName;
-
-      if (!tmplEventListeners[eventName])
-      {
-        tmplEventListeners[eventName] = createEventHandler(attrName);
-
-        for (var k = 0, names = domEvent.browserEvents(eventName), browserEventName; browserEventName = names[k++];)
-          domEvent.addGlobalHandler(browserEventName, tmplEventListeners[eventName]);
-      }
-
-      // hack for non-bubble events in IE<=8
-      if (!domEvent.W3CSUPPORT)
-      {
-        var eventInfo = domEvent.getEventInfo(eventName, tagName);
-        if (eventInfo.supported && !eventInfo.bubble)
-          result.attachEvent('on' + eventName, createEventTrigger(eventName));
-      }
-
-      result.setAttribute(attrName, actions);
-    }
-
-    function setAttribute(name, value){
-      if (SET_CLASS_ATTRIBUTE_BUG && name == 'class')
-        name = 'className';
-
-      result.setAttribute(name, value);
-    }
-
-
-    var result = parent || document.createDocumentFragment();
-
-    for (var i = parent ? 4 : 0, token; token = tokens[i]; i++)
-    {
-      switch(token[TOKEN_TYPE])
-      {
-        case TYPE_ELEMENT: 
-          var tagName = token[ELEMENT_NAME];
-          var parts = tagName.split(/:/);
-
-          var element = parts.length > 1
-            ? document.createElementNS(namespaceURI[parts[0]], tagName)
-            : document.createElement(tagName);
-
-          // precess for children and attributes
-          buildHtml(token, element);
-
-          // add to result
-          result.appendChild(element);
-
-          break;
-
-        case TYPE_ATTRIBUTE:
-          var attrName = token[ATTR_NAME];
-          var attrValue = token[ATTR_VALUE];
-          var eventName = attrName.replace(/^event-/, '');
-
-          if (eventName != attrName)
-          {
-            setEventAttribute(eventName, attrValue);
-          }
-          else
-          {
-            if (attrName != 'class' && attrName != 'style' ? !token[TOKEN_BINDINGS] : attrValue)
-              setAttribute(attrName, attrValue || '');
-          }
-
-          break;
-
-        case 4:
-        case 5:
-          var attrValue = token[ATTR_VALUE - 1];
-
-          if (attrValue)
-            setAttribute(ATTR_NAME_BY_TYPE[token[TOKEN_TYPE]], attrValue);
-
-          break;
-
-        case 6:
-          setEventAttribute(token[1], token[2] || token[1]);
-          break;
-
-        case TYPE_COMMENT:
-          result.appendChild(document.createComment(token[COMMENT_VALUE] || (token[TOKEN_REFS] ? '{' + token[TOKEN_REFS].join('|') + '}' : '')));
-          break;
-
-        case TYPE_TEXT:
-          // fix bug with normalize text node in IE8-
-          if (CLONE_NORMALIZATION_TEXT_BUG && i && tokens[i - 1][TOKEN_TYPE] == TYPE_TEXT)
-            result.appendChild(document.createComment(''));
-
-          result.appendChild(document.createTextNode(token[TEXT_VALUE] || (token[TOKEN_REFS] ? '{' + token[TOKEN_REFS].join('|') + '}' : '') || (token[TOKEN_BINDINGS] ? '{' + token[TOKEN_BINDINGS] + '}' : '')));
-          break;
-      }
-    }
-
-    return result;
-  };
-
-  function resolveTemplateById(refId){
-    var templateId = refId & 0xFFF;
-    var object = templates[templateId];
-
-    return object && object.template;
-  }
-
-  function resolveInstanceById(refId){
-    var templateId = refId & 0xFFF;
-    var instanceId = refId >> 12;
-    var object = templates[templateId];
-
-    return object && object.instances[instanceId];
-  }
-
-  function resolveObjectById(refId){
-    var templateRef = resolveInstanceById(refId);
-
-    return templateRef && templateRef.context;
-  }
-
-  function resolveTmplById(refId){
-    var templateRef = resolveInstanceById(refId);
-
-    return templateRef && templateRef.tmpl;
-  }
-
-  function getDebugInfoById(refId){
-    var templateRef = resolveInstanceById(refId);
-
-    return templateRef && templateRef.debug && templateRef.debug();
-  }
-
-
-  //
-  // html template
-  //
-
  /**
   * Build functions for creating instance of template.
   */
-  var builder = (function(){
+  var buildFunctions = (function(){
 
     var WHITESPACE = /\s+/;
     var W3C_DOM_NODE_SUPPORTED = typeof Node == 'function' && document instanceof Node;
@@ -316,19 +100,83 @@
     var bind_node = W3C_DOM_NODE_SUPPORTED
       // W3C DOM way
       ? function(domRef, oldNode, newValue){
-          var newNode = newValue instanceof Node && !newValue.basisNodeInUse ? newValue : domRef;
+          var newNode = domRef;
+
+          if (newValue instanceof Node)
+          {
+            if (newValue.nodeType == 11)  // fragment
+            {
+              if (newValue.firstChild === newValue.lastChild)
+                newNode = newValue.firstChild;
+              else
+                newNode = arrayFrom(newValue);
+            }
+            else
+              newNode = newValue;
+          }
+          /*else
+          {
+            if (newValue && Array.isArray(newValue))
+              if (newValue.length == 1)
+                newNode = newValue[0];
+              else
+                newNode = arrayFrom(newValue);
+          }*/
 
           if (newNode !== oldNode)
-            oldNode.parentNode.replaceChild(newNode, oldNode);
+          {
+            if (Array.isArray(newNode))
+            {
+              if (oldNode.fragmentStart)
+              {
+                newNode.fragmentStart = oldNode.fragmentStart;
+                newNode.fragmentEnd = oldNode.fragmentEnd;
+
+                var cursor = newNode.fragmentStart.nextSibling;
+                while (cursor && cursor != newNode.fragmentEnd)
+                {
+                  var tmp = cursor;
+                  cursor = cursor.nextSibling;
+                  tmp.parentNode.removeChild(tmp);
+                }
+              }
+              else
+              {
+                newNode.fragmentStart = document.createComment('start');
+                newNode.fragmentEnd = document.createComment('end');
+                oldNode.parentNode.insertBefore(newNode.fragmentStart, oldNode);
+                oldNode.parentNode.replaceChild(newNode.fragmentEnd, oldNode);
+              }
+
+              for (var i = 0, node; node = newNode[i]; i++)
+                newNode.fragmentEnd.parentNode.insertBefore(node, newNode.fragmentEnd);
+            }
+            else
+            {
+              if (oldNode && oldNode.fragmentStart)
+              {
+                var cursor = oldNode.fragmentStart.nextSibling;
+                while (cursor && cursor != oldNode.fragmentEnd)
+                {
+                  var tmp = cursor;
+                  cursor = cursor.nextSibling;
+                  tmp.parentNode.removeChild(tmp);
+                }
+                oldNode.fragmentStart.parentNode.removeChild(oldNode.fragmentStart);
+                oldNode = oldNode.fragmentEnd;
+              }
+
+              oldNode.parentNode.replaceChild(newNode, oldNode);
+            }
+          }
 
           return newNode;
         }
       // Old browsers way (IE6-8 and other)
       : function(domRef, oldNode, newValue){
-          var newNode = newValue && typeof newValue == 'object' && !newValue.basisNodeInUse ? newValue : domRef;
+          var newNode = newValue && typeof newValue == 'object' ? newValue : domRef;
 
           if (newNode !== oldNode)
-          {
             try {
               oldNode.parentNode.replaceChild(newNode, oldNode);
             } catch(e) {
@@ -336,7 +184,6 @@
               if (oldNode !== newNode)
                 oldNode.parentNode.replaceChild(newNode, oldNode);
             }
-          }
 
           return newNode;
         };
@@ -476,74 +323,23 @@
       return newValue;
     };
 
-   /**
-    * @func
-    */ 
-    function updateAttach(){
-      this.set(this.name, this.value);
-    }
 
-   /**
-    * @func
-    */ 
-    function resolveValue(bindingName, value, Attaches){
+
+    function resolveValue(attaches, updateAttach, bindingName, value){
       var bridge = value && value.bindingBridge;
-      var oldAttach = this.attaches && this.attaches[bindingName];
-      var tmpl = null;
+      var oldAttach = attaches[bindingName];
 
       if (bridge || oldAttach)
       {
         if (bridge)
         {
-          if (!oldAttach || value !== oldAttach.value)
+          if (value !== oldAttach)
           {
             if (oldAttach)
-            {
-              if (oldAttach.tmpl)
-              {
-                // FIX ME
-                oldAttach.tmpl.element.toString = null;
-                getL10nTemplate(oldAttach.value).clearInstance(oldAttach.tmpl);
-              }
-
-              oldAttach.value.bindingBridge.detach(oldAttach.value, updateAttach, oldAttach);
-            }
-
-            if (value.type == 'markup' && value instanceof basis.l10n.Token)
-            {
-              var template = getL10nTemplate(value);
-              var context = this.context;
-              var bindings = this.bindings;
-              var bindingInterface = this.bindingInterface;
-              tmpl = template.createInstance(context, null, function onRebuild(){
-                tmpl = newAttach.tmpl = template.createInstance(context, null, onRebuild, bindings, bindingInterface);
-                tmpl.element.toString = function(){
-                  return value.value;
-                };
-                updateAttach.call(newAttach);
-              }, bindings, bindingInterface);
-              tmpl.element.toString = function(){
-                return value.value;
-              }
-            }
-
-            if (!this.attaches)
-              this.attaches = new Attaches;
-
-            var newAttach = this.attaches[bindingName] = {
-              name: bindingName,
-              value: value,
-              tmpl: tmpl,
-              set: this.tmpl.set
-            };
-
-            bridge.attach(value, updateAttach, newAttach);
+              oldAttach.bindingBridge.detach(oldAttach, updateAttach, bindingName);
+            bridge.attach(value, updateAttach, bindingName);
+            attaches[bindingName] = value;
           }
-          else
-            tmpl = value && value.type == 'markup' ? oldAttach.tmpl : null;
-
-          if (tmpl)
-            return tmpl.element;
 
           value = bridge.get(value);
         }
@@ -551,112 +347,12 @@
         {
           if (oldAttach)
           {
-            if (oldAttach.tmpl)
-            {
-              // FIX ME
-              oldAttach.tmpl.element.toString = null;
-              getL10nTemplate(oldAttach.value).clearInstance(oldAttach.tmpl);
-            }
-
-            oldAttach.value.bindingBridge.detach(oldAttach.value, updateAttach, oldAttach);
-            this.attaches[bindingName] = null;
+            oldAttach.bindingBridge.detach(oldAttach, updateAttach, bindingName);
+            delete attaches[bindingName];
           }
         }
       }
-
       return value;
-    }
-
-   /**
-    * @func
-    */
-    function createBindingUpdater(names, getters){
-      return function bindingUpdater(object){
-        for (var i = 0, bindingName; bindingName = names[i]; i++)
-          this(bindingName, getters[bindingName](object));
-      };
-    }
-
-   /**
-    * @func
-    */
-    function createBindingFunction(keys){
-      var bindingCache = {};
-
-     /**
-      * @param {object} bindings
-      */
-      return function getBinding(bindings, obj, set, bindingInterface){
-        if (!bindings)
-          return {};
-
-        var cacheId = 'bindingId' in bindings ? bindings.bindingId : null;
-
-        /** @cut */ if (!cacheId)
-        /** @cut */   basis.dev.warn('basis.template.Template.getBinding: bindings has no bindingId property, cache is not used');
-
-        var result = bindingCache[cacheId];
-
-        if (!result)
-        {
-          var names = [];
-          var getters = {};
-          var events = {};
-          var handler = {};
-          var hasEvents = false;
-
-          for (var i = 0, bindingName; bindingName = keys[i]; i++)
-          {
-            var binding = bindings[bindingName];
-            var getter = binding && binding.getter;
-
-            if (getter)
-            {
-              getters[bindingName] = getter;
-              names.push(bindingName);
-
-              if (binding.events)
-              {
-                var eventList = String(binding.events).trim().split(/\s+|\s*,\s*/);
-
-                for (var j = 0, eventName; eventName = eventList[j]; j++)
-                {
-                  if (events[eventName])
-                    events[eventName].push(bindingName);
-                  else
-                    events[eventName] = [bindingName];
-                }
-              }
-            }
-          }
-
-          for (var eventName in events)
-          {
-            hasEvents = true;
-            handler[eventName] = createBindingUpdater(events[eventName], getters);
-          }
-
-          result = {
-            names: names,
-            sync: createBindingUpdater(names, getters),
-            handler: hasEvents ? handler : null
-          };
-
-          if (cacheId)
-            bindingCache[cacheId] = result;
-        }
-
-        if (obj && set)
-          result.sync.call(set, obj)
-
-        if (!bindingInterface)
-          return {};
-
-        if (result.handler)
-          bindingInterface.attach(obj, result.handler, set);
-
-        return result.handler;
-      };
     }
 
     var tools = {
@@ -668,123 +364,217 @@
       bind_attrClass: bind_attrClass,
       bind_attrStyle: bind_attrStyle,
       resolve: resolveValue,
-      l10nToken: l10nToken,
-      createBindingFunction: createBindingFunction
+      l10nToken: l10nToken
     };
 
     return function(tokens){
-      var fn = getFunctions(tokens, true, this.source.url, tokens.source_, !CLONE_NORMALIZATION_TEXT_BUG);
-      var createInstance;
-      var instances = {};
+      var fn = getFunctions(tokens, true, this.source.url, tokens.source_);
+      var templateMap = {};
       var l10nMap = {};
-      var l10nLinks = [];
-      var seed = 0;
+      var l10nProtoSync;
 
       var proto = buildHtml(tokens);
       var build = function(){
         return proto.cloneNode(true);
       };
 
-      var id = this.templateId;
-      templates[id] = {
-        template: this,
-        instances: instances
-      };
-
       if (fn.createL10nSync)
       {
-        var l10nProtoSync = fn.createL10nSync(proto, l10nMap, bind_attr, CLONE_NORMALIZATION_TEXT_BUG);
+        l10nProtoSync = fn.createL10nSync(proto, l10nMap, bind_attr, CLONE_NORMALIZATION_TEXT_BUG);
 
         for (var i = 0, key; key = fn.l10nKeys[i]; i++)
           l10nProtoSync(key, l10nToken(key).value);
-
-        if (fn.l10nKeys)
-          for (var i = 0, key; key = fn.l10nKeys[i]; i++)
-          {
-            var link = {
-              path: key,
-              token: l10nToken(key),
-              handler: function(value){
-                l10nProtoSync(this.path, value);
-                for (var key in instances)
-                  instances[key].tmpl.set(this.path, value);
-              }
-            };
-            link.token.attach(link.handler, link);
-            l10nLinks.push(link);
-            link = null;
-          }
       }
 
-      createInstance = fn.createInstance(id, instances, build, tools, l10nMap, CLONE_NORMALIZATION_TEXT_BUG);
-
       return {
-        createInstance: function(obj, onAction, onRebuild, bindings, bindingInterface){
-          var instanceId = seed++;
-          var instance = createInstance(instanceId, obj, onAction, onRebuild, bindings, bindingInterface);
-          
-          instances[instanceId] = instance;
-
-          return instance.tmpl;
-        },
-        destroyInstance: function(tmpl){
-          var instanceId = tmpl.templateId_;
-          var instance = instances[instanceId];
-
-          if (instance)
-          {
-            // detach handler if any
-            if (instance.handler)
-              instance.bindingInterface.detach(instance.context, instance.handler, instance.tmpl.set);
-
-            // detach attaches
-            for(var key in instance.attaches)
-              resolveValue.call(instance, key, null);
-
-            delete instances[instanceId];
-          }
-        },
+        createInstance: fn.createInstance(tmplNodeMap, templateMap, build, tools, l10nMap, CLONE_NORMALIZATION_TEXT_BUG),
+        l10nProtoSync: l10nProtoSync,
         
         keys: fn.keys,
-        /** @cut */ instances_: instances,
-
-        destroy: function(rebuild){
-          for (var i = 0, link; link = l10nLinks[i]; i++)
-            link.token.detach(link.handler, link);
-
-          for (var key in instances)
-          {
-            var instance = instances[key];
-
-            if (rebuild && instance.rebuild)
-              instance.rebuild.call(instance.context);
-
-            if (!rebuild || key in instances)
-            {
-              // detach handler if any
-              if (instance.handler)
-                instance.bindingInterface.detach(instance.context, instance.handler, instance.tmpl.set);
-
-              // detach attaches
-              for(var key in instance.attaches)
-                resolveValue.call(key, null);
-            }
-          }
-
-          if (templates[id] && templates[id].instances === instances)
-            delete templates[id];
-
-          fn = null;
-          build = null;
-          proto = null;
-          l10nMap = null;
-          l10nLinks = null;
-          l10nProtoSync = null;
-          instances = null;
-        }
+        l10nKeys: fn.l10nKeys,
+        map: templateMap
       };
     };
-  })();  
+  })();
+
+
+  //
+  // Constructs dom structure
+  //
+
+ /**
+  * @func
+  */
+  function findHostTemplate(cursor){
+    var refId;
+    var tmplRef;
+
+    do {
+      if (refId = cursor.basisObjectId)
+      {
+        // if node found, return it
+        if (tmplRef = tmplNodeMap[refId])
+          return tmplRef;
+      }
+    } while (cursor = cursor.parentNode);
+
+    return cursor;
+  }
+
+ /**
+  * @func
+  */
+  function createEventHandler(attrName){
+    return function(event){
+      event = new domEvent.Event(event);
+
+      // don't process right click - generaly FF problem
+      if (event && event.type == 'click' && event.which == 3)
+        return;
+
+      var cursor = event.sender;
+      var attr;
+      var refId;
+
+      // IE events may have no source, nothing to do in this case
+      if (!cursor)
+        return;
+
+      // search for nearest node with event-{eventName} attribute
+      do {
+        if (attr = (cursor.getAttributeNode && cursor.getAttributeNode(attrName)))
+          break;
+      } while (cursor = cursor.parentNode);
+
+      // if not found - exit
+      if (!cursor || !attr)
+        return;
+
+      // search for nearest node refer to basis.Class instance
+      var tmplRef = findHostTemplate(cursor);
+      if (tmplRef)
+      {
+        var actions = attr.nodeValue.qw();
+        event.actionTarget = cursor;
+        for (var i = 0, actionName; actionName = actions[i++];)
+          tmplRef.tmpl.action_(actionName, event);
+      }
+    };
+  }
+
+  function createEventTrigger(eventName){
+    return function(){
+      domEvent.fireEvent(document, eventName);
+    };
+  }
+
+ /**
+  * Creates dom structure by declaration.
+  */
+  var buildHtml = function(tokens, parent){
+    function setEventAttribute(eventName, actions){
+      var attrName = 'event-' + eventName;
+
+      if (!tmplEventListeners[eventName])
+      {
+        tmplEventListeners[eventName] = createEventHandler(attrName);
+
+        for (var k = 0, names = domEvent.browserEvents(eventName), browserEventName; browserEventName = names[k++];)
+          domEvent.addGlobalHandler(browserEventName, tmplEventListeners[eventName]);
+      }
+
+      // hack for non-bubble events in IE<=8
+      if (!domEvent.W3CSUPPORT)
+      {
+        var eventInfo = domEvent.getEventInfo(eventName, tagName);
+        if (eventInfo.supported && !eventInfo.bubble)
+          result.attachEvent('on' + eventName, createEventTrigger(eventName));
+      }
+
+      result.setAttribute(attrName, actions);
+    }
+
+    function setAttribute(name, value){
+      if (SET_CLASS_ATTRIBUTE_BUG && name == 'class')
+        name = 'className';
+
+      result.setAttribute(name, value);
+    }
+
+
+    var result = parent || document.createDocumentFragment();
+
+    for (var i = parent ? 4 : 0, token; token = tokens[i]; i++)
+    {
+      switch(token[TOKEN_TYPE])
+      {
+        case TYPE_ELEMENT: 
+          var tagName = token[ELEMENT_NAME];
+          var parts = tagName.split(/:/);
+
+          var element = parts.length > 1
+            ? document.createElementNS(namespaceURI[parts[0]], tagName)
+            : document.createElement(tagName);
+
+          // precess for children and attributes
+          buildHtml(token, element);
+
+          // add to result
+          result.appendChild(element);
+
+          break;
+
+        case TYPE_ATTRIBUTE:
+          var attrName = token[ATTR_NAME];
+          var attrValue = token[ATTR_VALUE];
+          var eventName = attrName.replace(/^event-/, '');
+
+          if (eventName != attrName)
+          {
+            setEventAttribute(eventName, attrValue);
+          }
+          else
+          {
+            if (attrName != 'class' && attrName != 'style' ? !token[TOKEN_BINDINGS] : attrValue)
+              setAttribute(attrName, attrValue || '');
+          }
+
+          break;
+
+        case 4:
+        case 5:
+          var attrValue = token[ATTR_VALUE - 1];
+
+          if (attrValue)
+            setAttribute(ATTR_NAME_BY_TYPE[token[TOKEN_TYPE]], attrValue);
+
+          break;
+
+        case 6:
+          setEventAttribute(token[1], token[2] || token[1]);
+          break;
+
+        case TYPE_COMMENT:
+          result.appendChild(document.createComment(token[COMMENT_VALUE] || (token[TOKEN_REFS] ? '{' + token[TOKEN_REFS].join('|') + '}' : '')));
+          break;
+
+        case TYPE_TEXT:
+          // fix bug with normalize text node in IE8-
+          if (CLONE_NORMALIZATION_TEXT_BUG && i && tokens[i - 1][TOKEN_TYPE] == TYPE_TEXT)
+            result.appendChild(document.createComment(''));
+
+          result.appendChild(document.createTextNode(token[TEXT_VALUE] || (token[TOKEN_REFS] ? '{' + token[TOKEN_REFS].join('|') + '}' : '') || (token[TOKEN_BINDINGS] ? '!' : '')));
+          break;
+      }
+    }
+
+    return result;
+  };
+
+  function resolveObjectById(refId){
+    return tmplNodeMap[refId].context;
+  }
+
 
  /**
   * @class
@@ -802,7 +592,7 @@
       return new HtmlTemplate(value);
     },
 
-    builder: builder
+    builder: buildFunctions
   });
 
 
@@ -830,11 +620,7 @@
   // TODO: remove
   //
   basis.template.extend({
-    /** @cut using only in dev mode */ getDebugInfoById: getDebugInfoById,
-
     buildHtml: buildHtml,
-
-    resolveTemplateById: resolveTemplateById,
-    resolveObjectById: resolveObjectById,
-    resolveTmplById: resolveTmplById
+    buildFunctions: buildFunctions,
+    resolveObjectById: resolveObjectById
   });

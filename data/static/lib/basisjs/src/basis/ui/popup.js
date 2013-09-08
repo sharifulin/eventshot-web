@@ -168,10 +168,11 @@
 
       this.setLayout(this.defaultDir, this.orientation);
     },
-    templateSync: function(){
-      UINode.prototype.templateSync.call(this);
+    templateSync: function(noRecreate){
+      UINode.prototype.templateSync.call(this, noRecreate);
 
-      this.realign();
+      if (this.element)
+        this.realign();
     },
     setLayout: function(dir, orientation, noRealign){
       var oldDir = this.dir;
