@@ -17,7 +17,7 @@ var Entry = basis.entity.createType('Entry', {
 
 var reader_ = Entry.entityType.reader;
 Entry.entityType.reader = function(data){
-  if (data.data)
+  if (data && data.data)
     data.created = data.data.created;
 
   return reader_.call(this, data);

@@ -29,6 +29,7 @@ var EntryNode = new basis.ui.Node.subclass({
     content: 'data:data',
     type: 'data:type',
     id: 'data:id',
+    url: 'data:data.url || ""',
     time: {
       events: 'update',
       getter: function(node){
@@ -48,7 +49,7 @@ var entryViews = {
   photo: EntryNode.subclass({
     template: resource('template/entry-photo.tmpl'),
     binding: {
-      url: 'data:data.photo',
+      imageUrl: 'data:data.photo',
       title: 'data:data.title',
       width: 'data:data.width',
       height: 'data:data.height'
@@ -57,7 +58,7 @@ var entryViews = {
   weather: EntryNode.subclass({
     template: resource('template/entry-weather.tmpl'),
     binding: {
-      image: 'data:data.photo',
+      image: 'data:data.pic',
       title: 'data:data.title'
     }
   })

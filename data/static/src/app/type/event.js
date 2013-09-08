@@ -1,4 +1,5 @@
 basis.require('basis.entity');
+basis.require('basis.net');
 basis.require('app.service');
 
 //
@@ -110,6 +111,13 @@ Event.extend({
           };
     },
     success: function(data){
+      if (!this.data.id)
+        basis.net.request({
+          timeout: 60000,
+          method: 'POST',
+          url: '/api/event/' + data.event.id + '/start'
+        });
+
       this.update(Event.reader(data.event));
     }
   }),
