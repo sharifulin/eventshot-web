@@ -91,18 +91,34 @@ var view = new basis.ui.Node({
           getter: function(node){
             return node.data.title || '';
           }
-        },
-        hasTitle: {
-          events: 'update',
-          getter: function(node){
-            return !!node.data.title;
+        }
+      },
+      action: {
+        change: function(event){
+          if (event.type == 'blur' || (event.type == 'keyup' && event.key == event.KEY.ENTER))
+          {
+            var id = this.data.id;
+            basis.net.request({
+              method: 'POST',
+              params: {
+                title: this.data.title
+              },
+              url: '/api/event/' + this.data.id /** @cut */ + '?uuid=30489C58E885A0E8B5C2A2A199862EFA'
+            }, function(data){
+              app.type.Event(id).set('title', data.event.title);
+            });
           }
-        },
-        noTitle: {
-          events: 'update',
-          getter: function(node){
-            return !node.data.title;
-          }
+          else
+            this.target.set('title', this.tmpl.input.value, true);
+        }
+      },
+      handler: {
+        targetChanged: function(){
+          var self = this;
+          basis.nextTick(function(){
+            if (!self.data.title)
+              self.focus();
+          });
         }
       }
     }),
@@ -132,6 +148,25 @@ var view = new basis.ui.Node({
           getter: function(node){
             return node.data.description || '';
           }
+        }
+      },
+      action: {
+        change: function(event){
+          if (event.type == 'blur' || (event.type == 'keyup' && event.key == event.KEY.ENTER))
+          {
+            var id = this.data.id;
+            basis.net.request({
+              method: 'POST',
+              params: {
+                description: this.data.description
+              },
+              url: '/api/event/' + this.data.id /** @cut */ + '?uuid=30489C58E885A0E8B5C2A2A199862EFA'
+            }, function(data){
+              app.type.Event(id).set('description', data.event.description);
+            });
+          }
+          else
+            this.target.set('description', this.tmpl.input.value, true);
         }
       }
     }),
