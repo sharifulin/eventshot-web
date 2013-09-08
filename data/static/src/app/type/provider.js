@@ -13,9 +13,9 @@ var Provider = basis.entity.createType('Provider', {
 
 Provider.all.sync([
   { id: 'instagram', title: 'Instagram' },
-  { id: 'twitter', title: 'Twitter', enabled: true },
+  { id: 'twitter', title: 'Twitter' },
   { id: 'foursquare', title: 'Foursquare' },
-  { id: 'facebook', title: 'Facebook', enabled: true }
+  { id: 'facebook', title: 'Facebook' }
 ]);
 
 Provider.assets = {
