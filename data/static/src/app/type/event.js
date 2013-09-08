@@ -45,7 +45,7 @@ var Event = basis.entity.createType('Event', {
 });
 
 Event.all.setSyncAction(app.service['default'].createAction({
-  url: 'api/event',
+  url: '/api/event',
   //url: 'data/event-list.json',
   success: function(data){
     this.sync(basis.array(data.events).map(Event.reader));
@@ -54,7 +54,7 @@ Event.all.setSyncAction(app.service['default'].createAction({
 
 Event.extend({
   syncAction: app.service['default'].createAction({
-    url: 'api/event/:id',
+    url: '/api/event/:id',
     request: function(){
       return {
         routerParams: {
@@ -72,7 +72,7 @@ Event.extend({
     request: function(){
       return !this.data.id
         ? {
-            url: 'api/event/create',
+            url: '/api/event/create',
             params: {
               start_date: this.data.startDate,
               end_date: this.data.endDate,
@@ -80,7 +80,7 @@ Event.extend({
             }
           }
         : {
-            url: 'api/event/:id',
+            url: '/api/event/:id',
             routerParams: {
               id: this.data.id
             },
@@ -97,7 +97,7 @@ Event.extend({
 
   remove: app.service['default'].createAction({
     method: 'POST',
-    url: 'api/:id/remove',
+    url: '/api/:id/remove',
     request: function(){
       return {
         routerParams: {
