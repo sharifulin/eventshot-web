@@ -1,9 +1,27 @@
 basis.require('basis.ui');
 basis.require('app.type');
 
+var checkedProvidersToken =new basis.DeferredToken();
 var checkedProviders = new basis.data.Value({
   value: []
 });
+checkedProvidersToken.attach(function(value){
+  checkedProviders.set(value);
+});
+var checkedProvidersSet = new basis.data.dataset.Subset({
+  source: app.type.Provider.all,
+  rule: function(provider){
+    return provider.data.enabled;
+  },
+  handler: {
+    itemsChanged: function(){
+      checkedProvidersToken.set(this.getItems().map(function(p){
+        return p.data.id;
+      }));
+    }
+  }
+});
+
 var view = new basis.ui.Node({
   autoDelegate: true,
   dataSource: app.type.Provider.all,
@@ -38,7 +56,17 @@ var view = new basis.ui.Node({
         var idx = providers.indexOf(this.data.id);
 
         if (idx == -1)
-          providers.push(this.data.id);
+        {
+          if (app.type.Provider(this.data.id).data.enabled)
+            providers.push(this.data.id);
+          else
+          {
+            var width = 800;
+            var height = 600;
+            window.open('/login/' + this.data.id, 'oauth', 'scrollbars=0, resizable=1, menubar=0, left=' + (screen.width - width) / 2 + ', top=' + (screen.height - height) / 2 + ', width=' + width + ', height=' + height + ', toolbar=0, status=0');
+            return false;
+          }
+        }
         else
           providers.splice(idx, 1);
 
