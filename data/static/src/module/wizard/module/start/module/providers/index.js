@@ -1,25 +1,8 @@
 basis.require('basis.ui');
 basis.require('app.type');
 
-var checkedProvidersToken =new basis.DeferredToken();
 var checkedProviders = new basis.data.Value({
   value: []
-});
-checkedProvidersToken.attach(function(value){
-  checkedProviders.set(value);
-});
-var checkedProvidersSet = new basis.data.dataset.Subset({
-  source: app.type.Provider.all,
-  rule: function(provider){
-    return provider.data.enabled;
-  },
-  handler: {
-    itemsChanged: function(){
-      checkedProvidersToken.set(this.getItems().map(function(p){
-        return p.data.id;
-      }));
-    }
-  }
 });
 
 var view = new basis.ui.Node({
@@ -52,7 +35,7 @@ var view = new basis.ui.Node({
     },
     action: {
       toggle: function(){
-        var providers = basis.array(checkedProviders.value);
+        var providers = basis.array(this.parentNode.data.providers);
         var idx = providers.indexOf(this.data.id);
 
         if (idx == -1)
@@ -77,5 +60,16 @@ var view = new basis.ui.Node({
     }
   }
 });
+
+app.onProvidersInit = function(){
+  view.update({
+    providers: app.type.Provider.all.getItems().filter(function(provider){
+        return provider.data.enabled;
+      }).map(function(provider){
+        return provider.data.id;
+      })
+  });
+}
+
 
 module.exports = view;

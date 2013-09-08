@@ -42,7 +42,7 @@ var Event = basis.entity.createType('Event', {
         return provider.data.enabled;
       }).map(function(provider){
         return provider.data.id;
-      })
+      });
     }
   },
   entries: basis.entity.createSetType('Entry')

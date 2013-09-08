@@ -39,7 +39,7 @@ var view = new basis.ui.Node({
 });
 
 
-basis.router.add('/add-event', {
+basis.router.add(/^\/add-event|\/?$/, {
   enter: function(id){
     view.setDelegate(app.type.Event({}));
   },

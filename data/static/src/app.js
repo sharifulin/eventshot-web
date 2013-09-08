@@ -37,6 +37,7 @@ module.exports = basis.app.create({
           lazyContent: resource('module/welcome/index.js')
         },
         {
+          selected: true,
           name: 'add-event',
           router: '/add-event',
           lazyContent: resource('module/wizard/index.js')

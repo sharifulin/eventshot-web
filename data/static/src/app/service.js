@@ -16,6 +16,11 @@ var defaultService = new basis.net.service.Service({
       app.type.Provider.all.forEach(function(provider){
         provider.set('enabled', data.user.prodivers.has(provider.data.id))
       });
+      if (app.onProvidersInit)
+      {
+        app.onProvidersInit();
+        app.onProvidersInit = null;
+      }
     }
   );
 })();
