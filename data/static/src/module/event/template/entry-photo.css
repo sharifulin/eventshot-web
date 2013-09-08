@@ -1,6 +1,10 @@
 .app-event-entry-photo
 {
-  padding: 5px;
+  padding: 15px 5px 10px;
+}
+.app-event-entry-photo .app-event-entry_source-icon
+{
+  margin-top: 0;
 }
 .app-event-entry-photo_photo-card_wrapper
 {
@@ -35,7 +39,7 @@
 {
   padding: 4px 10px;  
   display: inline-block;
-  background: padding-box rgba(255,255,255,.8);  
+  background: padding-box rgba(255,255,255,.85);  
 }
 .app-event-entry-photo_image
 {

@@ -28,7 +28,13 @@ var EntryNode = new basis.ui.Node.subclass({
     },
     content: 'data:data',
     type: 'data:type',
-    id: 'data:id'
+    id: 'data:id',
+    time: {
+      events: 'update',
+      getter: function(node){
+        return node.data.created.split(' ')[1].split(':').slice(0, 2).join(':');
+      }
+    }
   }
 });
 
