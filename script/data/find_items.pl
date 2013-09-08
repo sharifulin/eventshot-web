@@ -123,15 +123,17 @@ sub find_items {
 				for my $d (@{$list->{checkins}->{items} || []}) {
 					next if $d->{source}->{name} =~ /instagram/i;
 					
-					my $p = eval { $d->{photos}->{items}->[0] };
+					my $p    = eval { $d->{photos}->{items}->[0] };
+					my $icon = eval { $d->{venue}->{categories}->[0]->{icon} };
 					unshift @$items, {
 						id       => $d->{id},
-						title    => join(' @ ', $d->{shout}, $d->{venue}->{location}->{address}),
+						title    => $d->{shout} . ' @ ' . $d->{venue}->{name} . ', ' . $d->{venue}->{location}->{address},
 						url      => $d->{venue}->{canonicalUrl},
 						location => $d->{venue}->{location},
 						photo    => $p ? join('600x600', $p->{prefix}, $p->{suffix}) : undef,
 						width    => $p ? 600 : 0,
 						height   => $p ? 600 : 0,
+						icon     => $icon ? join('bg32', $icon->{prefix}, $icon->{suffix}) : undef,
 						created  => $self->u('time2iso', $d->{createdAt}),
 					};
 				}
@@ -236,6 +238,7 @@ sub find_items {
 					# filter useless feeds
 					next if $item->{from}->{id} != $user_id;
 					next if $item->{status_type} =~ m/shared|friend|tag/i;
+					next if $item->{status_type} =~ m/shared|friend|tag/i && $item->{type} ne 'video';
 					next if $item->{type} eq 'status' && !$item->{status_type}; #like page, and post on page
 					
 					# filter 
@@ -246,7 +249,7 @@ sub find_items {
 					
 					unshift @$items, {
 						id       => $item->{id},
-						title    => $item->{message} || $item->{story},
+						title    => $item->{message} || $item->{story} || $item->{caption},
 						url      => $item->{link} || $item->{actions}->[0]->{link},
 						location => undef, # XXX
 						photo    => $item->{picture},
