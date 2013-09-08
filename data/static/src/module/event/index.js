@@ -1,3 +1,4 @@
+basis.require('basis.date');
 basis.require('basis.ui');
 basis.require('app.type');
 
@@ -106,14 +107,14 @@ var view = new basis.ui.Node({
       events: 'update',
       getter: function(node){
         var date = basis.date.fromISOString(node.data.startDate);
-        return months[date.getMonth() - 1] + ' ' + date.getDate() + ', ' + date.getFullYear();
+        return months[date.getMonth()] + ' ' + date.getDate() + ', ' + date.getFullYear();
       }
     },
     endDate: {
       events: 'update',
       getter: function(node){
         var date = basis.date.fromISOString(node.data.endDate);
-        return months[date.getMonth() - 1] + ' ' + date.getDate() + ', ' + date.getFullYear();
+        return months[date.getMonth()] + ' ' + date.getDate() + ', ' + date.getFullYear();
       }
     },
 

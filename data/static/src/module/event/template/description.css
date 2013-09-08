@@ -1,7 +1,7 @@
 .app-event-description
 {
   margin: 0 9px;
-  padding: 0 2px;
+  padding: 1px 3px 0 2px;
   overflow: hidden;
 }
 .app-event-description_input

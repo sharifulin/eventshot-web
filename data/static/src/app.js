@@ -60,23 +60,15 @@ module.exports = basis.app.create({
     return new basis.ui.Node({
       template: resource('app/template/layout.tmpl'),
       binding: {
-        tabs: new basis.ui.Node({
-          template: resource('app/template/tabs.tmpl'),
-          childClass: {
-            template: resource('app/template/tab.tmpl'),
-            binding: {
-              title: 'data:value'
-            },
-            action: {
-              click: function(){
-                var name = this.data.value;
-                basis.router.navigate(name == 'welcome' ? '' : '/' + name);
-              }
-            }
-          },
-          childNodes: basis.data.wrap(['welcome', 'list', 'add-event'], true)
-        }),
         pages: pages
+      },
+      action: {
+        showEventList: function(){
+          basis.router.navigate('/list');
+        },
+        createEvent: function(){
+          basis.router.navigate('/add-event');
+        }
       }
     });
   }

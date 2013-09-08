@@ -16,8 +16,38 @@ BODY
   max-width: 980px;
   margin: 0 auto;
   padding: 0 10px;
-  border: 1px solid #EEE;
+  border: 1px solid #513c78;
   border-width: 0 1px;
   min-height: 100%;
   overflow: hidden;
+  position: relative;
+}
+
+.app-layout H1
+{
+  background: url(img/logo.png) no-repeat #3c1f71 5px 5px;
+  background-size: 50%;
+  margin: 0 -10px;
+  overflow: hidden;
+  text-indent: -1000px;
+  height: 180px;
+}
+
+.app-main-menu
+{
+  position: absolute;
+  top: 23px;
+  right: 13px;
+}
+.app-main-menu-item
+{
+  margin-left: 15px;
+  background: rgba(255,255,255,.65);
+  padding: 12px 20px;
+  font-size: 150%;
+  cursor: pointer;
+}
+.app-main-menu-item:hover
+{
+  background: rgba(255,255,255,.85);
 }

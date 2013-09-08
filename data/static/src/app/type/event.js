@@ -47,7 +47,7 @@ var Event = basis.entity.createType('Event', {
 
 var reader_ = Event.entityType.reader;
 Event.entityType.reader = function(data){
-  if (data.entries)
+  if (data && data.entries)
     data.entries.forEach(function(entry){
       if (entry.data && entry.data.weather)
       {
