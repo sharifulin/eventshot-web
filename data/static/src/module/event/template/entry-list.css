@@ -3,6 +3,7 @@
   display: none;
   border-left: 3px solid #E0E0E0;
   margin-left: 40px;
+  padding-bottom: 3em;
 }
 .app-event-entry-list__visible
 {

@@ -3,6 +3,21 @@ basis.require('basis.ui');
 basis.require('basis.ui.popup');
 basis.require('basis.ui.calendar');
 
+var months = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December'
+];
+
 var calendar = new basis.ui.calendar.Calendar({
   maxDate: new Date,
   sections: ['Month'],
@@ -34,8 +49,20 @@ var view = new basis.ui.Node({
 
   template: resource('template/view.tmpl'),
   binding: {
-    startDate: 'data:',
-    endDate: 'data:'
+    startDate: {
+      events: 'update',
+      getter: function(node){
+        var date = basis.date.fromISOString(node.data.startDate);
+        return months[date.getMonth()] + ' ' + date.getDate() + ', ' + date.getFullYear();
+      }
+    },
+    endDate: {
+      events: 'update',
+      getter: function(node){
+        var date = basis.date.fromISOString(node.data.endDate);
+        return months[date.getMonth()] + ' ' + date.getDate() + ', ' + date.getFullYear();
+      }
+    }
   },
   action: {
     pickStartDate: function(event){

@@ -18,13 +18,13 @@ var Event = basis.entity.createType('Event', {
   startDate: {
     type: String,
     defValue: function(){
-      return '2013-09-01';
+      return (new Date()).add('day', -7).toISOString();
     }
   },
   endDate: {
     type: String,
     defValue: function(){
-      return '2013-09-08';
+      return (new Date()).toISOString();
     }
   },
 
