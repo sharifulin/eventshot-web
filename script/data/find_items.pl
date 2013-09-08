@@ -248,12 +248,14 @@ sub find_items {
 					$item->{picture} =~ s/\/([\d_]+)_s\.jpg/\/s640x640\/$1_n\.jpg/ if $item->{picture};
 					
 					unshift @$items, {
-						id       => $item->{id},
-						title    => $item->{message} || $item->{story} || $item->{caption},
-						url      => $item->{link} || $item->{actions}->[0]->{link},
-						location => undef, # XXX
-						photo    => $item->{picture},
-						created  => clean_date($item->{created_time}),
+						id          => $item->{id},
+						title       => $item->{message} || $item->{story} || $item->{caption},
+						url         => $item->{link} || $item->{actions}->[0]->{link},
+						location    => undef, # XXX
+						photo       => $item->{picture},
+						created     => clean_date($item->{created_time}),
+						type        => $item->{type},
+						status_type => $item->{status_type},
 					};
 				}
 			
