@@ -19,8 +19,9 @@ var reader_ = Entry.entityType.reader;
 Entry.entityType.reader = function(data){
   if (data.data)
     data.created = data.data.created;
+
   return reader_.call(this, data);
-}
+};
 
 //
 // export names

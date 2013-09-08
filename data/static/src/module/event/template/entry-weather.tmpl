@@ -1,0 +1,13 @@
+<b:style src="entry-text.css"/>
+<b:style src="entry-weather.css"/>
+
+<b:include src="entry.tmpl" class="app-event-entry-weather">
+  <b:replace ref="content">
+    <div class="app-event-entry-text_wrapper">
+      <img class="app-event-entry-weather_image" src="{image}"/>
+      {title}
+      <br/>
+      <span class="app-event-entry-time">{time}</span>  
+    </div>
+  </b:replace>
+</div>

@@ -44,6 +44,25 @@ var Event = basis.entity.createType('Event', {
   entries: basis.entity.createSetType('Entry')
 });
 
+var reader_ = Event.entityType.reader;
+Event.entityType.reader = function(data){
+  if (data.entries)
+    data.entries.forEach(function(entry){
+      if (entry.data && entry.data.weather)
+      {
+        data.entries.push({
+          id: -entry.id,
+          created: entry.data.created,
+          source: 'weather',
+          type: 'weather',
+          data: basis.object.complete({ created: entry.data.created}, entry.data.weather)
+        });
+      }
+    });
+
+  return reader_.call(this, data);
+};
+
 Event.all.setSyncAction(app.service['default'].createAction({
   url: '/api/event',
   //url: 'data/event-list.json',

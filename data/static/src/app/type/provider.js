@@ -22,7 +22,8 @@ Provider.assets = {
   instagram: basis.asset('src/app/template/logos/instagram.png'),
   twitter: basis.asset('src/app/template/logos/twitter.png'),
   foursquare: basis.asset('src/app/template/logos/foursquare.png'),
-  facebook: basis.asset('src/app/template/logos/facebook.png')
+  facebook: basis.asset('src/app/template/logos/facebook.png'),
+  weather: basis.asset('src/app/template/logos/weather.png')
 };
 
 //

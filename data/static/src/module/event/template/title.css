@@ -1,13 +1,14 @@
 .app-event-title
 {
   padding: 8px 2px 0;
+  margin: 0 9px;  
   overflow: hidden;
 }
 .app-event-title_input
 {
   margin: 5px 0px;
   padding: 5px;
-  font-size: 180%;
+  font-size: 250%;
   border: 1px solid transparent;
   width: 100%;
   box-sizing: border-box;

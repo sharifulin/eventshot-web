@@ -53,6 +53,13 @@ var entryViews = {
       width: 'data:data.width',
       height: 'data:data.height'
     }
+  }),
+  weather: EntryNode.subclass({
+    template: resource('template/entry-weather.tmpl'),
+    binding: {
+      image: 'data:data.photo',
+      title: 'data:data.title'
+    }
   })
 };
 
