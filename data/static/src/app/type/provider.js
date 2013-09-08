@@ -12,17 +12,17 @@ var Provider = basis.entity.createType('Provider', {
 });
 
 Provider.all.sync([
-  { id: 'facebook', title: 'Facebook', enabled: true },
   { id: 'instagram', title: 'Instagram' },
   { id: 'twitter', title: 'Twitter', enabled: true },
-  { id: 'foursquare', title: 'Foursquare' }
+  { id: 'foursquare', title: 'Foursquare' },
+  { id: 'facebook', title: 'Facebook', enabled: true }
 ]);
 
 Provider.assets = {
-  facebook: basis.asset('src/app/template/logos/facebook.png'),
   instagram: basis.asset('src/app/template/logos/instagram.png'),
   twitter: basis.asset('src/app/template/logos/twitter.png'),
-  foursquare: basis.asset('src/app/template/logos/foursquare.png')
+  foursquare: basis.asset('src/app/template/logos/foursquare.png'),
+  facebook: basis.asset('src/app/template/logos/facebook.png')
 };
 
 //
