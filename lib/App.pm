@@ -88,11 +88,16 @@ sub startup {
 	$apiu->route('/event')->get->to('api-event#list');
 	$apiu->route('/event/create')->post->to('api-event#create');
 	
+	my $apiei = $apiu->bridge('/event_item/:id', id => qr/\d+/)->to('api-event_item#check');
+	$apiei->get->to('api-event_item#item');
+	$apiei->route('/update')->post->to('api-event_item#update');
+	#$apiei->route('/update')->to('api-event_item#update');
+	
 	my $apie = $apiu->bridge('/event/:id', id => qr/\d+/)->to('api-event#check');
 	$apie->get ->to('api-event#item');
 	$apie->post->to('api-event#update');
 	$apie->post->to('api-event#remove');
-	
+
 	# HACK
 	$apie->route('/start')->post->to('api-event#start');
 	
