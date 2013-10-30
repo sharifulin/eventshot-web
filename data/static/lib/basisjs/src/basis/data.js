@@ -217,13 +217,13 @@
         if (mask & 1)
         {
           var cfg = subscriptionConfig[idx];
+
+          actions.push(cfg.action);
+
           for (var key in cfg.handler)
-          {
-            actions.push(cfg.action);
             handler[key] = handler[key]
               ? mixFunctions(handler[key], cfg.handler[key])  // suppose it never be used, but do it for double sure
               : cfg.handler[key];
-          }
         }
         idx <<= 1;
         mask >>= 1;
@@ -529,16 +529,15 @@
   //
 
   var computeFunctions = {};
-
-  var VALUE_TOKEN_HANDLER = {
-    change: function(sender){
-      var cursor = this;
-
-      while (cursor = cursor.tokens_)
-        cursor.token.set(cursor.fn(sender.value));
-    }
+  var valueSetters = {};
+  var valueSyncToken = function(value){
+    this.set(this.fn(value));
   };
-
+  var VALUE_EMMITER_HANDLER = { 
+    destroy: function(object){
+      this.value.unlink(object, this.fn);
+    }
+  };  
 
  /**
   * @class
@@ -548,11 +547,17 @@
 
    /**
     * Fires when value was changed.
-    * @param {*} curValue Current value.
     * @param {*} oldValue Value before changes.
     * @event
     */
-    emit_change: createEvent('change', 'curValue', 'oldValue'),
+    emit_change: createEvent('change', 'oldValue') && function(oldValue){
+      events.change.call(this, oldValue);
+
+      var cursor = this;
+
+      while (cursor = cursor.links_)
+        cursor.fn.call(cursor.context, this.value, oldValue);
+    },
 
    /**
     * Actual value.
@@ -588,7 +593,22 @@
    /**
     * @type {object}
     */
-    tokens_: null,
+    links_: null,    
+
+   /**
+    * Settings for bindings.
+    */
+    bindingBridge: {
+      attach: function(host, callback, context){
+        host.link(context, callback, true);
+      },
+      detach: function(host, callback, context){
+        host.unlink(context, callback);
+      },
+      get: function(host){
+        return host.value;
+      }
+    },
 
    /**
     * @constructor
@@ -618,7 +638,7 @@
         this.value = newValue;
 
         if (!this.locked)
-          this.emit_change(newValue, oldValue);
+          this.emit_change(oldValue);
       }
 
       return changed;
@@ -653,7 +673,7 @@
 
         if (this.value !== this.lockedValue_)
         {
-          this.emit_change(this.value, this.lockedValue_);
+          this.emit_change(this.lockedValue_);
           this.lockedValue_ = null;
         }
       }
@@ -750,35 +770,23 @@
     * @return {basis.Token|basis.DeferredToken}
     */ 
     as: function(fn, deferred){
-      if (typeof fn != 'function')
-        fn = basis.fn.$self;
-
-      if (this.tokens_)
+      if (this.links_)
       {
         // try to find token with the same function
         var cursor = this;
 
-        while (cursor = cursor.tokens_)
-          if (cursor.fn == String(fn)) // compare functions as strings, as they should be with no sideeffect
+        while (cursor = cursor.links_)
+          if (cursor.context instanceof basis.Token && cursor.context.fn == String(fn)) // compare functions as strings, as they should be with no sideeffect
             return deferred
-              ? cursor.token.deferred()
-              : cursor.token;
-      }
-      else
-      {
-        // add handler on value change, if there was no token before
-        this.addHandler(VALUE_TOKEN_HANDLER);
+              ? cursor.context.deferred()
+              : cursor.context;
       }
 
       // create token
-      var token = new basis.Token(fn(this.value));
+      var token = new basis.Token();
+      token.fn = fn;
 
-      // add to list
-      this.tokens_ = {
-        fn: fn,
-        token: token,
-        tokens_: this.tokens_
-      };
+      this.link(token, valueSyncToken);
 
       return deferred ? token.deferred() : token;
     },
@@ -791,17 +799,93 @@
       return this.as(fn, true);
     },
 
+   /* 
+    * @param {object} context Target object.
+    * @param {string|function} fn Property or setter function.
+    * @return {object} Returns object.
+    */
+    link: function(context, fn, noApply){
+      if (typeof fn != 'function')
+      {
+        var property = String(fn);
+
+        fn = valueSetters[property];
+
+        if (!fn)
+          fn = valueSetters[property] = function(value){
+            this[property] = value;
+          };
+      }
+
+      // check for duplicates
+      /** @cut */ var cursor = this;
+      /** @cut */ while (cursor = cursor.links_)
+      /** @cut */   if (cursor.context === context && cursor.fn === fn)
+      /** @cut */   {
+      /** @cut */     basis.dev.warn(this.constructor.className + '#attach: Duplicate link pair context-fn');
+      /** @cut */     break;
+      /** @cut */   }
+
+      // create link
+      this.links_ = {
+        value: this,
+        context: context,
+        fn: fn,
+        links_: this.links_
+      };
+      
+      // add handler if object is basis.event.Emitter
+      if (context instanceof Emitter)
+        context.addHandler(VALUE_EMMITER_HANDLER, this.links_);
+
+      if (!noApply)
+        fn.call(context, this.value);
+
+      return context;
+    },
+
+   /* 
+    * @param {object} context Target object.
+    * @param {string|function} fn Property or setter function.
+    * @return {object} Returns object.
+    */
+    unlink: function(context, fn){
+      var cursor = this;
+      var prev;
+
+      while (prev = cursor, cursor = cursor.links_)
+        if (cursor.context === context && (!fn || cursor.fn === fn))
+        {
+          // prevent apply new values
+          cursor.fn = basis.fn.$undef;
+
+          // delete link
+          prev.links_ = cursor.links_;
+
+          // remove handler if object is basis.event.Emitter
+          if (cursor.context instanceof Emitter)
+            cursor.context.removeHandler(VALUE_EMMITER_HANDLER, cursor);
+        }
+    },
+
    /**
     * @destructor
     */
     destroy: function(){
+      var cursor = this;
+
+      // remove event handlers from all basis.event.Emitter instances
+      while (cursor = cursor.links_)
+        if (cursor.object instanceof Emitter)
+          cursor.object.removeHandler(VALUE_EMMITER_HANDLER, cursor);
+
       AbstractData.prototype.destroy.call(this);
 
       this.proxy = null;
       this.initValue = null;
       this.value = null;
       this.lockedValue_ = null;
-      this.tokens_ = null;
+      this.links_ = null;
     }
   });
 
@@ -859,11 +943,6 @@
     delegate: null,
 
    /**
-    * @type {boolean}
-    */
-    canSetDelegate: true,
-
-   /**
     * Fires when delegate was changed.
     * @param {basis.data.Object} oldDelegate Object delegate before changes.
     * @event
@@ -907,14 +986,6 @@
     emit_rootChanged: createEvent('rootChanged', 'oldRoot'),
 
    /**
-    * Flag determines object behaviour when assigned delegate is destroing:
-    * - true - destroy object on delegate object destroing (cascade destroy)
-    * - false - don't destroy object, detach delegate only
-    * @type {boolean}
-    */
-    cascadeDestroy: false,
-
-   /**
     * Default listeners.
     * @inheritDoc
     */
@@ -949,10 +1020,7 @@
           this.emit_rootChanged(oldRoot);
         },
         destroy: function(){
-          if (this.cascadeDestroy)
-            this.destroy();
-          else
-            this.setDelegate();
+          this.setDelegate();
         }
       }
     },
@@ -961,6 +1029,9 @@
     * @constructor
     */
     init: function(){
+      // root always must be set, by default root is instance itself
+      this.root = this;
+
       // inherit
       AbstractData.prototype.init.call(this);
 
@@ -970,16 +1041,17 @@
       if (delegate)
       {
         // assign a delegate
-        // NOTE: ignore for this.data & this.state, no update/stateChanged events fired
         this.delegate = null;
+
+        // assign data & state to avoid update and stateChanged events
         this.data = delegate.data;
         this.state = delegate.state;
+
+        // assign delegate
         this.setDelegate(delegate);
       }
       else
       {
-        this.root = this;
-
         // if data doesn't exists - init it
         if (!this.data)
           this.data = {};
@@ -990,18 +1062,14 @@
       }
     },
 
-   /**
-    * Returns root delegate object (that haven't delegate).
-    * @return {basis.data.Object}
-    */
-    getRootDelegate: function(){
-      var object = this;
-
-      while (object.delegate && object.delegate !== object)
-        object = object.delegate;
-
-      return object;
-    },
+    /** @cut */ setSyncAction: function(syncAction){
+    /** @cut */   // object with delegate and syncAction can produce data and state conflicts with delegate
+    /** @cut */   // warn about it
+    /** @cut */   if (syncAction && this.delegate)
+    /** @cut */     basis.dev.warn(this.constructor.syncAction + ' instance has a delegate and syncAction - it may produce conflics with data & state');
+    /** @cut */   
+    /** @cut */   AbstractData.prototype.setSyncAction.call(this, syncAction);
+    /** @cut */ },
 
    /**
     * Set new delegate object or reject it (if passed null).
@@ -1027,9 +1095,6 @@
     * @return {boolean} Returns current delegate object.
     */
     setDelegate: function(newDelegate){
-      if (!this.canSetDelegate)
-        return false;
-
       // check is newDelegate can be linked to this object as delegate
       if (newDelegate && newDelegate instanceof DataObject)
       {
@@ -1147,7 +1212,7 @@
     * @return {boolean} Current object state.
     */
     setState: function(state, data){
-      var root = this.target || this.getRootDelegate();
+      var root = this.target || this.root;
 
       // set new state for root
       if (root !== this)
@@ -1162,7 +1227,7 @@
     * @return {Object|boolean} Delta if object data (this.data) was updated or false otherwise.
     */
     update: function(data){
-      var root = this.target || this.getRootDelegate();
+      var root = this.target || this.root;
 
       if (root !== this)
         return root.update(data);
@@ -1216,7 +1281,7 @@
   //
 
   var Slot = Class(DataObject, {
-    className: namespace('Slot')
+    className: namespace + '.Slot'
   });
 
 
@@ -1234,7 +1299,7 @@
   * @class
   */
   var KeyObjectMap = Class(null, {
-    className: namespace('KeyObjectMap'),
+    className: namespace + '.KeyObjectMap',
 
     itemClass: DataObject,
     keyGetter: $self,
@@ -1322,7 +1387,10 @@
     var deleted = [];
 
     if (!a || !a.itemCount)
-      inserted = b.getItems();
+    {
+      if (b)
+        inserted = b.getItems();
+    }
     else
     {
       if (!b || !b.itemCount)
@@ -1392,14 +1460,14 @@
     * @constructor
     */
     init: function(){
+      DataObject.prototype.init.call(this);
+
       var dataset = this.dataset;
       if (dataset)
       {
         this.dataset = null;
         this.setDataset(dataset);
       }
-
-      DataObject.prototype.init.call(this);
     },
 
    /**
@@ -1433,6 +1501,42 @@
     },
 
    /**
+    * Proxy method for contained dataset.
+    */ 
+    has: function(object){
+      return this.dataset ? this.dataset.has(object) : null;
+    },
+
+   /**
+    * Proxy method for contained dataset.
+    */ 
+    getItems: function(){
+      return this.dataset ? this.dataset.getItems() : [];
+    },
+
+   /**
+    * Proxy method for contained dataset.
+    */ 
+    pick: function(){
+      return this.dataset ? this.dataset.pick() : null;
+    },
+
+   /**
+    * Proxy method for contained dataset.
+    */
+    top: function(count){
+      return this.dataset ? this.dataset.top(count) : [];
+    },   
+
+   /**
+    * Proxy method for contained dataset.
+    */ 
+    forEach: function(fn){
+      if (this.dataset)
+        return this.dataset.forEach(fn);
+    },
+
+   /**
     * @destructor
     */
     destroy: function(){
@@ -1447,8 +1551,8 @@
  /**
   * @class
   */
-  var AbstractDataset = Class(DataObject, {
-    className: namespace('AbstractDataset'),
+  var AbstractDataset = Class(AbstractData, {
+    className: namespace + '.AbstractDataset',
 
    /**
     * Cardinality of set.
@@ -1527,7 +1631,7 @@
     */
     init: function(){
       // inherit
-      DataObject.prototype.init.call(this);
+      AbstractData.prototype.init.call(this);
 
       this.members_ = {};
       this.items_ = {};
@@ -1605,7 +1709,7 @@
       this.clear();
 
       // inherit
-      DataObject.prototype.destroy.call(this);
+      AbstractData.prototype.destroy.call(this);
 
       this.cache_ = EMPTY_ARRAY;  // empty array here, to prevent recalc cache
       this.itemCount = 0;
@@ -1620,7 +1724,7 @@
   * @class
   */
   var Dataset = Class(AbstractDataset, {
-    className: namespace('Dataset'),
+    className: namespace + '.Dataset',
 
    /**
     * @inheritDoc
@@ -1924,7 +2028,7 @@
     }
 
     function setAccumulateStateOff(){
-      proto.emit_itemsChanged = realEvent;
+      proto.emit_itemsChanged = realEvent
       flushAllDataset();
     }
 
@@ -1980,16 +2084,6 @@
       ? value.map(wrapper)
       : wrapper(value);
   }
-
-
-  //
-  // namespace wrapper
-  //
-
-  module.setWrapper(function(value){
-    ;;;basis.dev.warn('using basis.data as function is deprecated now, use basis.data.wrapData instead');
-    return wrapData(value);
-  });
 
 
   //

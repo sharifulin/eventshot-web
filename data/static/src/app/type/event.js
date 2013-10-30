@@ -144,7 +144,7 @@ Event.extend({
         basis.net.request({
           timeout: 60000,
           method: 'POST',
-          url: '/api/event/' + data.event.id + '/start' /** @cut */ + ('?uuid=30489C58E885A0E8B5C2A2A199862EFA')
+          url: '/api/event/' + data.event.id + '/start' /** @cut */ + '?uuid=' + app.uuid
         });
 
       this.update(Event.reader(data.event));

@@ -2,7 +2,6 @@
   basis.require('basis.ua');
   basis.require('basis.event');
   basis.require('basis.data');
-  basis.require('basis.timer');
 
  /**
   * @namespace basis.net
@@ -78,10 +77,10 @@
     },
     handler: {
       start: function(request){
-        inprogressTransports.add(request.transport);
+        basis.array.add(inprogressTransports, request.transport);
       },
       complete: function(request){
-        inprogressTransports.remove(request.transport);
+        basis.array.remove(inprogressTransports, request.transport);
       }
     }
   });
@@ -180,7 +179,7 @@
       {
         //find idle transport
         for (var id in this.requests)
-          if (this.requests[id].isIdle() && !this.requestQueue.has(this.requests[id]))
+          if (this.requests[id].isIdle() && !this.requestQueue.indexOf(this.requests[id]) != -1)
           {
             request = this.requests[id];
             delete this.requests[id];
@@ -274,10 +273,10 @@
 
   var TRANSPORT_REQUEST_HANDLER = {
     start: function(sender, request){
-      this.inprogressRequests.add(request);
+      basis.array.add(this.inprogressRequests, request);
     },
     complete: function(sender, request){
-      this.inprogressRequests.remove(request);
+      basis.array.remove(this.inprogressRequests, request);
     }
   };
 
@@ -286,7 +285,7 @@
       var nextRequest = this.requestQueue.shift();
       if (nextRequest)
       {
-        basis.timer.nextTick(function(){
+        basis.nextTick(function(){
           nextRequest.doRequest();
         });
       }
@@ -305,14 +304,14 @@
   /** @const */ var STATE_LOADING = 3;
   /** @const */ var STATE_DONE = 4;
 
-  var METHODS = 'HEAD GET POST PUT PATCH DELETE TRACE LINK UNLINK CONNECT'.qw();
+  var METHODS = 'HEAD GET POST PUT PATCH DELETE TRACE LINK UNLINK CONNECT'.split(' ');
   var IS_POST_REGEXP = /POST/i;
   var IS_METHOD_WITH_BODY = /^(POST|PUT|PATCH|LINK|UNLINK)$/i;
   var ESCAPE_CHARS = /[\%\=\&\<\>\s\+]/g;
 
   function escapeValue(value){
     return String(value).replace(ESCAPE_CHARS, function(m){
-      var code = m.charCodeAt(0).toHex();
+      var code = m.charCodeAt(0).toString(16).toUpperCase();
       return '%' + (code.length < 2 ? '0' : '') + code;
     });
   }
@@ -494,7 +493,14 @@
 
     getResponseData: function(){
       if (/^application\/json/i.test(this.data.contentType))
-        return this.data.responseText.toObject();
+      {
+        try {
+          var content = String(this.data.responseText);
+          return basis.json.parse(content);
+        } catch(e) {
+          ;;;consoleMethods.warn('basis.net: Can\'t parse JSON from ' + this.url, { url: url, content: content });
+        }
+      }
       else
         return this.data.responseText;
     },
@@ -631,12 +637,20 @@
         this.clearTimeout();
         this.xhr.abort();
 
-        if (this.xhr.readyState != STATE_DONE)
+        if (this.xhr.readyState != STATE_DONE && this.xhr.readyState != STATE_UNSENT)
           readyStateChangeHandler.call(this, STATE_DONE);
       }
     },
 
     setTimeout: function(timeout){
+      // According to XMLHttpRequest specification, timeout property can't be set for synchronous
+      // requests and browser must throw exception on property set (like Firefox and Chrome 29 does).
+      // setTimeout also doesn't work in this case, because synchronous request blocks
+      // browser and it never fire until request finished.
+      // http://www.w3.org/TR/XMLHttpRequest/#the-timeout-attribute
+      if (!this.xhr.asynchronous)
+        return;
+
       if ('ontimeout' in this.xhr)
       {
         this.xhr.timeout = timeout;
@@ -647,7 +661,7 @@
     },
 
     clearTimeout: function(){
-      if ('ontimeout' in this.xhr == false)
+      if (this.timer_)
         this.timer_ = clearTimeout(this.timer_);
     },
 
@@ -767,7 +781,7 @@
           failureCallback(error);
         },
         complete: function(){
-          basis.timer.nextTick(function(){
+          basis.nextTick(function(){
             transport.destroy();
           });
         }

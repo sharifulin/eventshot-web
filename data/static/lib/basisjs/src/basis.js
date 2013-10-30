@@ -36,21 +36,11 @@
 ;(function(global){ // global is current context (`window` in browser and `global` on node.js)
   'use strict';
 
+  var VERSION = '1.0.0-rc3';
+
   var document = global.document;
-  var prefetchedResources = global.__resources__;
   var Object_toString = Object.prototype.toString;
 
-
- /**
-  * Returns first not null value.
-  * @param {...*} args
-  * @return {*}
-  */
-  function coalesce(/* arg1 .. argN */){
-    for (var i = 0; i < arguments.length; i++)
-      if (arguments[i] != null)
-        return arguments[i];
-  }
 
  /**
   * Copy all properties from source (object) to destination object.
@@ -432,7 +422,7 @@
       {
         case 'string':
           result = function(object){
-            return modificator.format(func(object));
+            return String_extensions.format(modificator, func(object));
           };
         break;
 
@@ -490,19 +480,6 @@
     __extend__: getter
   });
 
- /**
-  * @param {function(object)|string|object} getter
-  * @param {*} defValue
-  * @param {function(value):boolean} checker
-  * @return {function(object)}
-  */
-  function def(getter, defValue, checker){
-    checker = checker || $isNull;
-    return function(object){
-      var res = getter(object);
-      return checker(res) ? defValue : res;
-    };
-  }
 
  /**
   * @param {string} key
@@ -567,14 +544,6 @@
       if (!fired++)
         return run.apply(thisObject || this, arguments);
     };
-  }
-
- /**
-  * Retuns function body code
-  * @return {string}
-  */
-  function functionBody(fn){
-    return fn.toString().replace(/^\s*\(?\s*function[^(]*\([^\)]*\)[^{]*\{|\}\s*\)?\s*$/g, '');
   }
 
 
@@ -672,11 +641,12 @@
       })();
 
       // by default
-      var addToQueue = function(taskId){
+      var defaultAddToQueue = function(taskId){
         setTimeout(function(){
           runTask(taskId);
         }, 0);
       };
+      var addToQueue = defaultAddToQueue;
 
       //
       // implement platform specific solution
@@ -745,20 +715,40 @@
           }
           else
           {
+            var createScript = function(){
+              return document.createElement('script');
+            };
+
             if (document && 'onreadystatechange' in createScript())
             {
               // Create a <script> element; its readystatechange event will be fired asynchronously once it is inserted
               // into the document. Do so, thus queuing up the task. Remember to clean up once it's been called
-              addToQueue = function(taskId){
-                var scriptEl = createScript();
-                scriptEl.onreadystatechange = function(){
-                  runTask(taskId);
+              addToQueue = function beforeHeadReady(taskId){
+                if (typeof documentInterface != 'undefined')
+                {
+                  addToQueue = defaultAddToQueue;
 
-                  scriptEl.onreadystatechange = null;
-                  scriptEl.parentNode.removeChild(scriptEl);
-                  scriptEl = null;
-                };
-                document.documentElement.appendChild(scriptEl);
+                  documentInterface.head.ready(function(){
+                    addToQueue = function(taskId){
+                      var scriptEl = createScript();
+                      scriptEl.onreadystatechange = function(){
+                        runTask(taskId);
+
+                        scriptEl.onreadystatechange = null;
+                        //scriptEl.parentNode.removeChild(scriptEl);
+                        documentInterface.remove(scriptEl);
+                        scriptEl = null;
+                      };
+                      //document.documentElement.appendChild(scriptEl);
+                      documentInterface.head.add(scriptEl);
+                    };
+                  });
+                }
+
+                if (addToQueue === beforeHeadReady)
+                  defaultAddToQueue(taskId);
+                else
+                  addToQueue(taskId);
               };
             }
           }
@@ -787,18 +777,25 @@
   var pathUtils = (function(){
     var origin = '';
     var baseURI;
-    var utils;
+    var utils = {};
 
     if (NODE_ENV)
     {
-      utils = slice(require('path'), [
+      var methods = [
         'normalize',
         'dirname',
         'extname',
         'basename',
         'resolve',
         'relative'
-      ]);
+      ];
+
+      for (var i = 0, method; method = methods[i]; i++)
+        utils[method] = (function(method, path){
+          return function(){
+            return path[method].apply(path, arguments).replace(/\\/g, '/');
+          }
+        })(method, require('path'));
 
       baseURI = utils.resolve('.') + '/';
     }
@@ -1017,14 +1014,13 @@
   * Special processing options:
   * - autoload: namespace that must be loaded right after core loaded
   * - path: dictionary of paths for root namespaces
-  * - extClass: extend buildin classes (Object, Array, String, )
   *
   * Other options copy into basis.config as is.
   */
   var config = (function(){
     var basisBaseURI = '';
     var config = {
-      extClass: true
+      extProto: 'warn'
     };
 
     if (NODE_ENV)
@@ -1047,6 +1043,10 @@
           } catch (e) {
             ;;;consoleMethods.error('basis.js config parse fault: ' + e);
           }
+
+          // warn about extClass in basis-config, this option was introduced in 0.9.8 for preventing using custom methods via buildin clasess
+          // TODO: remove this warning in later versions
+          /** @cut */ if ('extClass' in config) consoleMethods.warn('extClass option in basis-config is not required, basis.js doesn\'t extend buildin classes by custom methods any more');
 
           basisFilename = pathUtils.normalize(scriptEl.src)
           basisBaseURI = pathUtils.dirname(basisFilename);
@@ -1092,88 +1092,6 @@
 
 
   // ============================================
-  // Namespace subsystem
-  //
-
-  var namespaces = {};
-
- /**
-  * Returns namespace by path or creates new one (if namespace isn't exists).
-  * @example
-  *   var fooBarNamespace = basis.namespace('foo.bar');
-  * @name namespace
-  * @param {string} path
-  * @param {function()} wrapFunction Deprecated.
-  * @return {basis.Namespace}
-  */
-  var getNamespace = function(path, wrapFunction){
-    var cursor = global;
-    var nsRoot;
-
-    path = path.split('.');
-    for (var i = 0, name; name = path[i]; i++)
-    {
-      if (!cursor[name])
-      {
-        var nspath = path.slice(0, i + 1).join('.');
-
-        // create new namespace
-        cursor[name] = (function(path, wrapFn){
-         /**
-          * @returns {*|undefined}
-          */
-          function namespace_(){
-            if (wrapFunction)
-              return wrapFunction.apply(this, arguments);
-          }
-
-          var wrapFunction = typeof wrapFn == 'function' ? wrapFn : null;
-          var pathFn = function(name){
-            return path + (name ? '.' + name : '');
-          };
-          pathFn.toString = $const(path);
-
-          return extend(namespace_, {
-            path: pathFn,
-            exports: {
-              path: pathFn
-            },
-            toString: $const('[basis.namespace ' + path + ']'),
-            extend: function(names){
-              extend(this.exports, names);
-              return complete(this, names);
-            },
-            setWrapper: function(wrapFn){
-              if (typeof wrapFn == 'function')
-              {
-                ;;;if (wrapFunction) consoleMethods.warn('Wrapper for ' + path + ' is already set. Probably mistake here.');
-                wrapFunction = wrapFn;
-              }
-            }
-          });
-        })(nspath, i < path.length ? wrapFunction : null);
-
-        if (nsRoot)
-          nsRoot.namespaces_[nspath] = cursor[name];
-      }
-
-      cursor = cursor[name];
-
-      if (!nsRoot)
-      {
-        nsRoot = cursor;
-        if (!nsRoot.namespaces_)
-          nsRoot.namespaces_ = {};
-      }
-    }
-
-    namespaces[path.join('.')] = cursor;
-
-    return cursor;
-  }
-
-
-  // ============================================
   // OOP section: Class implementation
   //
 
@@ -1183,56 +1101,48 @@
     * This namespace introduce class creation scheme. It recomended for new
     * classes creation, but use able to use buildin sheme for your purposes.
     *
-    * The main benefits that provides by this sheme, that all methods are able
-    * to call inherited method (via this.inherit(args..)), like in other OO
-    * languages. All Basis classes and components (with some exceptions) are
+    * All Basis classes and components (with some exceptions) are
     * building using this sheme.
+    *
     * @example
-    *   var classA = basis.Class(null, { // you can use basis.Class instead of null
+    *   var Foo = basis.Class(null, { // you can use basis.Class instead of null
     *     name: 'default value',
     *     init: function(title){ // special method - constructor
     *       this.title = title;
     *     },
     *     say: function(){
-    *       return 'My name is {0}.'.format(this.title);
+    *       return 'My name is ' + this.title;
     *     }
     *   });
     *
-    *   var classB = basis.Class(classA, {
+    *   var Bar = basis.Class(Foo, {
     *     age: 0,
     *     init: function(title, age){
-    *       classA.prototype.init.call(this, title);
+    *       Foo.prototype.init.call(this, title);
     *       this.age = age;
     *     },
     *     say: function(){
-    *       return classA.prototype.say.call(this) + ' I\'m {0} year old.'.format(this.age);
+    *       return Foo.prototype.say.call(this) + ' I\'m ' + this.age + ' year old.';
     *     }
     *   });
     *
-    *   var foo = new classA('John');
-    *   var bar = new classB('Ivan', 25);
-    *   alert(foo.say()); // My name is John.
-    *   alert(bar.say()); // My name is Ivan. I'm 25 year old.
-    *   alert(bar instanceof basis.Class); // false (for some reasons it false now)
-    *   alert(bar instanceof classA); // true
-    *   alert(bar instanceof classB); // true
+    *   var foo = new Foo('John');
+    *   var bar = new Bar('Ivan', 25);
+    *   console.log(foo.say()); // My name is John.
+    *   console.log(bar.say()); // My name is Ivan. I'm 25 year old.
+    *   console.log(bar instanceof basis.Class); // true
+    *   console.log(bar instanceof Foo); // true
+    *   console.log(bar instanceof Bar); // true
+    *
     * @namespace basis.Class
     */
-
-    var namespace = 'basis.Class';
-
-
-   /**
-    * Root class for all classes created by Basis class model.
-    */
-    var BaseClass = function(){};
 
    /**
     * Global instances seed.
     */
-    var seed = { id: 1 };
+    var instanceSeed = { id: 1 };
     var classSeed = 1;
-    var NULL_FUNCTION = function(){};
+    /** @cut */ var classes = [];
 
    /**
     * Class construct helper: self reference value
@@ -1241,7 +1151,6 @@
 
    /**
     * Test object is it a class.
-    * @func
     * @param {Object} object
     * @return {boolean} Returns true if object is class.
     */
@@ -1250,17 +1159,19 @@
     }
 
    /**
-    * @func
+    * @param {function()} superClass
+    * @return {boolean}
     */
     function isSubclassOf(superClass){
       var cursor = this;
+
       while (cursor && cursor !== superClass)
         cursor = cursor.superClass_;
+
       return cursor === superClass;
     }
 
    /**
-    * @func
     * dev mode only
     */
     function dev_verboseNameWrap(name, args, fn){
@@ -1276,195 +1187,211 @@
     })();
 
 
-    //
-    // main class object
-    //
-    extend(BaseClass, {
-      // Base class name
-      className: namespace,
+   /**
+    * Class constructor.
+    * @param {function()} SuperClass Class that new one inherits of.
+    * @param {...object} extensions Objects that extends new class prototype.
+    * @return {function()} A new class.
+    */
+    function createClass(SuperClass, extensions){
+      var classId = classSeed++;
 
+      if (typeof SuperClass != 'function')
+        SuperClass = BaseClass;
+
+      /** @cut */ var className = '';
+
+      /** @cut */ for (var i = 1, extension; extension = arguments[i]; i++)
+      /** @cut */   if (typeof extension != 'function' && extension.className)
+      /** @cut */     className = extension.className;
+
+      /** @cut */ if (!className)
+      /** @cut */   className = SuperClass.className + '._Class' + classId;
+      /** @cut */ // consoleMethods.warn('Class has no name');
+
+      // temp class constructor with no init call
+      var NewClassProto = function(){};
+
+      // verbose name in dev
+      /** @cut */ NewClassProto = dev_verboseNameWrap(className, {}, NewClassProto);
+
+      NewClassProto.prototype = SuperClass.prototype;
+
+      var newProto = new NewClassProto;
+      var newClassProps = {
+        /** @cut */ className: className,
+
+        basisClassId_: classId,
+        superClass_: SuperClass,
+        extendConstructor_: !!SuperClass.extendConstructor_,
+
+        // class methods
+        isSubclassOf: isSubclassOf,
+        subclass: function(){
+          return createClass.apply(null, [newClass].concat(arrayFrom(arguments)));
+        },
+        extend: extendClass,
+
+        // auto extend creates a subclass
+        __extend__: function(value){
+          if (value && value !== SELF && (typeof value == 'object' || (typeof value == 'function' && !isClass(value))))
+            return BaseClass.create.call(null, newClass, value);
+          else
+            return value;
+        },
+
+        // new class prototype
+        prototype: newProto
+      };
+
+      // extend newClass prototype
+      for (var i = 1, extension; extension = arguments[i]; i++)
+        newClassProps.extend(extension);
+
+      /** @cut */if (newProto.init !== BaseClass.prototype.init && !/^function[^(]*\(\)/.test(newProto.init) && newClassProps.extendConstructor_) consoleMethods.warn('probably wrong extendConstructor_ value for ' + newClassProps.className);
+
+      // new class constructor
+      var newClass = newClassProps.extendConstructor_
+        // constructor with instance extension
+        ? function(extend){
+            // mark object
+            this.basisObjectId = instanceSeed.id++;
+
+            // extend and override instance properties
+            var prop;
+            for (var key in extend)
+            {
+              prop = this[key];
+              this[key] = prop && prop.__extend__
+                ? prop.__extend__(extend[key])
+                : extend[key];
+            }
+
+            // call constructor
+            this.init();
+
+            // post init
+            this.postInit();
+          }
+
+        // simple constructor
+        : function(){
+            // mark object
+            this.basisObjectId = instanceSeed.id++;
+
+            // call constructor
+            this.init.apply(this, arguments);
+
+            // post init
+            this.postInit();
+          };
+
+      // verbose name in dev
+      // NOTE: this code makes Chrome and Firefox show class name in console
+      ;;;newClass = dev_verboseNameWrap(className, { instanceSeed: instanceSeed }, newClass);
+
+      // add constructor property to prototype
+      newProto.constructor = newClass;
+
+      for (var key in newProto)
+        if (newProto[key] === SELF)
+          newProto[key] = newClass;
+        //else
+        //  newProto[key] = newProto[key];
+
+      // extend constructor with properties
+      extend(newClass, newClassProps);
+
+      // for class introspection
+      /** @cut */ classes.push(newClass);
+
+      // return new class
+      return newClass;
+    }
+
+   /**
+    * Extend class prototype
+    * @param {Object} source If source has a prototype, it will be used to extend current prototype.
+    * @return {function()} Returns `this`.
+    */
+    function extendClass(source){
+      var proto = this.prototype;
+
+      if (typeof source == 'function' && !isClass(source))
+        source = source(this.superClass_.prototype);
+
+      if (source.prototype)
+        source = source.prototype;
+
+      for (var key in source)
+      {
+        var value = source[key];
+        var protoValue = proto[key];
+
+        if (key == 'className' || key == 'extendConstructor_')
+          this[key] = value;
+        else
+        {
+          if (protoValue && protoValue.__extend__)
+            proto[key] = protoValue.__extend__(value);
+          else
+          {
+            proto[key] = value;
+            //;;;if (value && !value.__extend__ && (value.constructor == Object || value.constructor == Array)){ consoleMethods.warn('!' + key); }
+          }
+        }
+      }
+
+      // for browsers that doesn't enum toString
+      if (TOSTRING_BUG && source[key = 'toString'] !== Object_toString)
+        proto[key] = source[key];
+
+      return this;
+    }
+
+
+    //
+    // base class
+    //
+    var BaseClass = extend(createClass, {
+      className: 'basis.Class',
+
+      // non-auto extend by default
       extendConstructor_: false,
 
       // prototype defaults
       prototype: {
+        basisObjectId: 0,
+
         constructor: null,
-        init: NULL_FUNCTION,
-        postInit: NULL_FUNCTION,
-        toString: function(){
-          return '[object ' + (this.constructor || this).className + ']';
+        
+        init: function(){
         },
+        postInit: function(){
+        },
+
+        /** @cut */ toString: function(){ // verbose in dev
+        /** @cut */   return '[object ' + (this.constructor || this).className + ']';
+        /** @cut */ },
+
         destroy: function(){
           for (var prop in this)
-            this[prop] = null;
+            if (hasOwnProperty.call(this, prop))
+              this[prop] = null;
 
           this.destroy = $undef;
         }
-      },
-
-     /**
-      * Class constructor.
-      * @param {function()} SuperClass Class that new one inherits of.
-      * @param {...object} extensions Objects that extends new class prototype.
-      * @return {function()} A new class.
-      */
-      create: function(SuperClass, extensions){
-        var classId = classSeed++;        
-
-        if (typeof SuperClass != 'function')
-          SuperClass = BaseClass;
-
-        /** @cut */ var className = '';
-
-        /** @cut */ for (var i = 1, extension; extension = arguments[i]; i++)
-        /** @cut */   if (typeof extension != 'function' && extension.className)
-        /** @cut */     className = extension.className;
-
-        /** @cut */ if (!className)
-        /** @cut */   className = SuperClass.className + '._Class' + classId;
-        /** @cut */// consoleMethods.warn('Class has no name');
-
-        // temp class constructor with no init call
-        var NewClassProto = function(){};
-
-        // verbose name in dev
-        /** @cut */ NewClassProto = dev_verboseNameWrap(className, {}, NewClassProto);
-
-        NewClassProto.prototype = SuperClass.prototype;
-
-        var newProto = new NewClassProto;
-        var newClassProps = {
-          /** @cut */ className: className,
-
-          basisClassId_: classId,
-          superClass_: SuperClass,
-          extendConstructor_: !!SuperClass.extendConstructor_,
-
-          // class methods
-          isSubclassOf: isSubclassOf,
-          subclass: function(){
-            return BaseClass.create.apply(null, [newClass].concat(arrayFrom(arguments)));
-          },
-          extend: BaseClass.extend,
-          // auto extend creates a subclass
-          __extend__: function(value){
-            if (value && value !== SELF && (typeof value == 'object' || (typeof value == 'function' && !isClass(value))))
-              return BaseClass.create.call(null, newClass, value);
-            else
-              return value;
-          },
-
-          // new class prototype
-          prototype: newProto
-        };
-
-        // extend newClass prototype
-        for (var i = 1, extension; extension = arguments[i]; i++)
-          newClassProps.extend(extension);
-
-
-        /** @cut */if (newProto.init != NULL_FUNCTION && !/^function[^(]*\(\)/.test(newProto.init) && newClassProps.extendConstructor_) consoleMethods.warn('probably wrong extendConstructor_ value for ' + newClassProps.className);
-
-        // new class constructor
-        var newClass = newClassProps.extendConstructor_
-          // constructor with instance extension
-          ? function(extend){
-              // mark object
-              this.basisObjectId = seed.id++;
-
-              // extend and override instance properties
-              var prop;
-              for (var key in extend)
-              {
-                prop = this[key];
-                this[key] = prop && prop.__extend__
-                  ? prop.__extend__(extend[key])
-                  : extend[key];
-              }
-
-              // call constructor
-              this.init();
-
-              // post init
-              this.postInit();
-            }
-
-          // simple constructor
-          : function(){
-              // mark object
-              this.basisObjectId = seed.id++;
-
-              // call constructor
-              this.init.apply(this, arguments);
-
-              // post init
-              this.postInit();
-            };
-
-        // verbose name in dev
-        // NOTE: this code makes Chrome and Firefox show class name in console
-        ;;;newClass = dev_verboseNameWrap(className, { seed: seed }, newClass);
-
-        // add constructor property to prototype
-        newProto.constructor = newClass;
-
-        for (var key in newProto)
-          if (newProto[key] === SELF)
-            newProto[key] = newClass;
-          //else
-          //  newProto[key] = newProto[key];
-
-        // extend constructor with properties
-        extend(newClass, newClassProps);
-
-        return newClass;
-      },
-
-     /**
-      * Extend class prototype
-      * @param {Object} source If source has a prototype, it will be used to extend current prototype.
-      * @return {function()} Returns `this`.
-      */
-      extend: function(source){
-        var proto = this.prototype;
-
-        if (typeof source == 'function' && !isClass(source))
-          source = source(this.superClass_.prototype);
-
-        if (source.prototype)
-          source = source.prototype;
-
-        for (var key in source)
-        {
-          var value = source[key];
-          var protoValue = proto[key];
-
-          if (key == 'className' || key == 'extendConstructor_')
-            this[key] = value;
-          else
-          {
-            if (protoValue && protoValue.__extend__)
-              proto[key] = protoValue.__extend__(value);
-            else
-            {
-              proto[key] = value;
-              //;;;if (value && !value.__extend__ && (value.constructor == Object || value.constructor == Array)){ consoleMethods.warn('!' + key); }
-            }
-          }
-        }
-
-        // for browsers that doesn't enum toString
-        if (TOSTRING_BUG && source[key = 'toString'] !== Object_toString)
-          proto[key] = source[key];
-
-        return this;
       }
     });
 
 
    /**
-    * @func
+    * @param {object} extension
+    * @param {function()=} fn
+    * @param {string} devName Dev only
+    * @return {object}
     */
-    var customExtendProperty = function(extension, func, devName){
+    var customExtendProperty = function(extension, fn, devName){
       return {
         __extend__: function(extension){
           if (!extension)
@@ -1474,10 +1401,13 @@
             return extension;
 
           var Base = function(){};
-          /** @cut verbose name in dev */Base = dev_verboseNameWrap(devName || 'customExtendProperty', {}, Base);
+          /** @cut verbose name in dev */ Base = dev_verboseNameWrap(devName || 'customExtendProperty', {}, Base);
           Base.prototype = this;
+
           var result = new Base;
-          func(result, extension);
+
+          fn(result, extension);
+
           return result;
         }
       }.__extend__(extension || {});
@@ -1485,7 +1415,8 @@
 
 
    /**
-    * @func
+    * @param {object} extension
+    * @return {object}
     */
     var extensibleProperty = function(extension){
       return customExtendProperty(extension, extend, 'extensibleProperty');
@@ -1493,7 +1424,8 @@
 
 
    /**
-    * @func
+    * @param {object} extension
+    * @return {object}
     */
     var nestedExtendProperty = function(extension){
       return customExtendProperty(extension, function(result, extension){
@@ -1508,23 +1440,25 @@
     };
 
    /**
-    * @func
+    * @param {function()} fn
+    * @param {object=} keys
+    * @return {object}
     */
     var oneFunctionProperty = function(fn, keys){
       var create = function(keys){
-        var result;
+        var result = {
+          __extend__: create
+        };
 
         if (keys)
         {
           if (keys.__extend__)
             return keys;
 
-          result = {
-            __extend__: create
-          };
-
           // verbose name in dev
-          ;;;var Cls = dev_verboseNameWrap('oneFunctionProperty', {}, function(){}); result = new Cls; result.__extend__ = create;
+          /** @cut */ var Cls = dev_verboseNameWrap('oneFunctionProperty', {}, function(){});
+          /** @cut */ result = new Cls;
+          /** @cut */ result.__extend__ = create;
 
           for (var key in keys)
             if (keys[key])
@@ -1542,11 +1476,14 @@
     // export names
     //
 
-    return getNamespace(namespace, BaseClass.create).extend({
+    return extend(BaseClass, {
+      /** @cut */ all_: classes,
+
       SELF: SELF,
-      BaseClass: BaseClass,
-      create: BaseClass.create,
+
+      create: createClass,
       isClass: isClass,
+
       customExtendProperty: customExtendProperty,
       extensibleProperty: extensibleProperty,
       nestedExtendProperty: nestedExtendProperty,
@@ -1586,10 +1523,10 @@
     */ 
     bindingBridge: {
       attach: function(host, fn, context){
-        return host.attach(fn, context);
+        host.attach(fn, context);
       },
       detach: function(host, fn, context){
-        return host.detach(fn, context);
+        host.detach(fn, context);
       },
       get: function(host){
         return host.get();
@@ -1746,6 +1683,8 @@
   * @class
   */ 
   var DeferredToken = Token.subclass({
+    className: 'basis.DeferredToken',
+
    /**
     * Set new value for token and schedule to call apply method.
     * @param {*} value
@@ -1777,11 +1716,13 @@
 
   // apply prefetched resources to cache
   (function(){
-    if (prefetchedResources)
-      for (var key in prefetchedResources)
-        resourceRequestCache[pathUtils.resolve(key)] = prefetchedResources[key];
+    if (typeof __resources__ != 'undefined')
+    {
+      for (var key in __resources__)
+        resourceRequestCache[pathUtils.resolve(key)] = __resources__[key];
 
-    prefetchedResources = null; // reset prefetched to reduce memory leaks
+      __resources__ = null; // reset prefetched to reduce memory leaks
+    }
   })();
 
   var getResourceContent = function(url, ignoreCache){
@@ -1941,6 +1882,9 @@
     return resourceCache[resourceUrl];
   };
 
+  var nsRootPath = slice(config.path);
+  /** @cut */ var requires;
+
   extend(getResource, {
     getFiles: function(){
       var result = [];
@@ -1957,18 +1901,82 @@
       return !!resourceCache.hasOwnProperty(pathUtils.resolve(resourceUrl));
     },
     extensions: {
-      '.js': function(resource, url){
-        return runScriptInContext({ exports: {} }, url, resource).exports;
+      '.js': function(content, filename){
+        var namespace = filename2namespace[filename];
+
+        if (!namespace) 
+        {
+          var implicitNamespace = true;
+          namespace = (pathUtils.dirname(filename) + '/' + pathUtils.basename(filename, pathUtils.extname(filename)));
+
+          for (var ns in config.path)
+          {
+            var path = config.path[ns] + ns + '/';
+            if (filename.substr(0, path.length) == path)
+            {
+              implicitNamespace = false;
+              namespace = namespace.substr(config.path[ns].length);
+              break;
+            }
+          }
+
+          namespace = namespace.replace(/\./g, '_').replace(/\//g, '.');
+
+          if (implicitNamespace)
+            namespace = 'implicit.' + namespace;
+        }
+
+        /** @cut */ if (requires)
+        /** @cut */   Array_extensions.add(requires, namespace);
+
+        if (!namespaces[namespace])
+        {
+          var ns = getNamespace(namespace);
+
+          /** @cut */ var savedRequires = requires;
+          /** @cut */ requires = [];
+
+          ns.exports = runScriptInContext({
+            path: ns.path,
+            exports: ns.exports
+          }, filename, content).exports;
+
+          if (ns.exports && ns.exports.constructor === Object)
+            complete(ns, ns.exports);
+
+          /** @cut */ ns.filename_ = filename;
+          /** @cut */ ns.source_ = content;
+          /** @cut */ ns.requires_ = requires;
+
+          /** @cut */ requires = savedRequires;
+        }
+
+        return namespaces[namespace].exports;
       },
-      '.json': extend(function(resource, url){
-        if (typeof resource == 'object')
-          return resource;
+
+      '.css': extend(function(content, url){
+        var resource = CssResource.resources[url];
+
+        if (!resource)
+          resource = new CssResource(url);
+        else
+          resource.updateCssText(content);
+
+        return resource;
+      }, {
+        updatable: true
+      }),
+
+      '.json': extend(function(content, url){
+        if (typeof content == 'object')
+          return content;
 
         var result;
         try {
-          result = JSON.parse(String(resource));
+          content = String(content);
+          result = basis.json.parse(content);
         } catch(e) {
-          ;;;consoleMethods.warn('basis.resource: Can\'t parse JSON from ' + url, { url: url, source: String(resource) });
+          ;;;consoleMethods.warn('basis.resource: Can\'t parse JSON from ' + url, { url: url, content: content });
         }
         return result || null;
       }, {
@@ -1988,11 +1996,15 @@
     // compile context function
     if (typeof compiledSourceCode != 'function')
       try {
-        compiledSourceCode = new Function('exports, module, basis, global, __filename, __dirname, resource',
-          '//@ sourceURL=' + pathUtils.origin + sourceURL + '\n' +
-          '//# sourceURL=' + pathUtils.origin + sourceURL + '\n' +
+        compiledSourceCode = new Function('exports, module, basis, global',
+          'var __filename = "' + (sourceURL).replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '";\n' +
+          'var __dirname = basis.path.dirname(__filename);\n' +
+          'var resource = function(url){ return basis.resource(__dirname + "/" + url); };\n' +
+          //'var require = function(url){ return basis.require(url, __dirname); };\n' +
           '"use strict";\n\n' +
           sourceCode
+          /** @cut */ + '\n//@ sourceURL=' + pathUtils.origin + sourceURL
+          /** @cut */ + '\n//# sourceURL=' + pathUtils.origin + sourceURL + '\n'
         );
       } catch(e) {
         /** @cut */ if ('line' in e == false && 'addEventListener' in window)
@@ -2039,6 +2051,97 @@
   };
 
 
+  // ============================================
+  // Namespace subsystem
+  //
+
+  var namespaces = {};
+  var namespace2filename = {};
+  var filename2namespace = {};
+
+  if (typeof __namespace_map__ != 'undefined')
+    (function(map){
+      for (var key in map)
+      {
+        var filename = pathUtils.resolve(key);
+        var namespace = map[key]
+        filename2namespace[filename] = namespace;
+        namespace2filename[namespace] = filename;
+      }
+    })(__namespace_map__);
+
+  var Namespace = Class(null, {
+    className: 'basis.Namespace',
+    init: function(name){
+      this.name = name;
+      this.exports = {
+        path: this.name
+      };
+    },
+    toString: function(){
+      return '[basis.namespace ' + this.path + ']';
+    },
+    extend: function(names){
+      extend(this.exports, names);
+      return complete(this, names);
+    }
+  });
+
+  function getRootNamespace(name){
+    var namespace = namespaces[name];
+
+    if (!namespace)
+    {
+      namespace = namespaces[name] = new Namespace(name)
+
+      namespace.namespaces_ = {};
+      namespace.namespaces_[name] = namespace;
+
+      if (!config.noConflict)
+        global[name] = namespace;
+    }
+
+    // builder could generate some code here, something like this
+    // if (name == 'app' && !app)
+    //   return app = namespace;
+
+    return namespace;
+  }
+
+ /**
+  * Returns namespace by path or creates new one (if namespace isn't exists).
+  * @example
+  *   var fooBarNamespace = basis.namespace('foo.bar');
+  * @name namespace
+  * @param {string} path
+  * @return {basis.Namespace}
+  */
+  var getNamespace = function(path){
+    path = path.split('.');
+
+    var rootNs = getRootNamespace(path[0]);
+    var cursor = rootNs;
+
+    for (var i = 1, name; name = path[i]; i++)
+    {
+      if (!cursor[name])
+      {
+        var nspath = path.slice(0, i + 1).join('.');
+
+        // create new namespace
+        cursor[name] = new Namespace(nspath);
+        rootNs.namespaces_[nspath] = cursor[name];
+      }
+
+      cursor = cursor[name];
+    }
+
+    namespaces[path.join('.')] = cursor;
+
+    return cursor;
+  }
+
+
  /**
   * @param {string} namespace
   * @name require
@@ -2048,82 +2151,88 @@
     {
       var requirePath = pathUtils.dirname(module.filename) + '/';
       var moduleProto = module.constructor.prototype;
-      return function(path){
-        var _compile = moduleProto._compile;
-        var namespace = getNamespace(path);
+      return function(filename, dirname){
+        if (!/[^a-z0-9_\.]/i.test(filename) || pathUtils.extname(filename) == '.js')
+        {
+          var _compile = moduleProto._compile;
+          var namespace = getNamespace(filename);
 
-        // patch node.js module._compile
-        moduleProto._compile = function(content, filename){
-          this.basis = basis;
-          content = 
-            'var basis = module.basis;\n' +
-            'var resource = function(filename){ return basis.require(__dirname + "/" + filename) };\n' +
-            content;
-          _compile.call(extend(this, namespace), content, filename);
-        };
+          // patch node.js module._compile
+          moduleProto._compile = function(content, filename){
+            this.basis = basis;
+            content = 
+              'var basis = module.basis;\n' +
+              'var resource = function(filename){ return basis.require(__dirname + "/" + filename) };\n' +
+              //'var require = function(filename){ return basis.require(filename, __dirname) };\n' +
+              content;
+            _compile.call(extend(this, namespace), content, filename);
+          };
 
-        var exports = require(requirePath + path.replace(/\./g, '/'));
-        namespace.exports = exports;
-        complete(namespace, exports);
+          var exports = require(requirePath + filename.replace(/\./g, '/'));
+          
+          namespace.exports = exports;
+          if (exports && exports.constructor === Object)
+            complete(namespace, exports);
 
-        // restore node.js module._compile
-        moduleProto._compile = _compile;
+          // restore node.js module._compile
+          moduleProto._compile = _compile;
 
-        return exports;
+          return exports;
+        }
+        else
+        {
+          filename = pathUtils.resolve(dirname, filename);
+          return require(filename);
+        }
       };
     }
     else
     {
-      var nsRootPath = config.path;
-      var requested = {};
-      /** @cut */ var requires;
-
-      return function(namespace){
-        if (/[^a-z0-9_\.]/i.test(namespace))
-          throw 'Namespace `' + namespace + '` contains wrong chars.';
-
-        /** @cut */ if (requires)
-        /** @cut */   requires.push(namespace);
-
-        var filename = namespace.replace(/\./g, '/') + '.js';
-        var namespaceRoot = namespace.split('.')[0];
-
-        if (namespaceRoot == namespace)
-          nsRootPath[namespaceRoot] = nsRootPath[namespace] || pathUtils.baseURI;
-
-        if (!namespaces[namespace])
+      return function(filename, dirname){
+        if (!/[^a-z0-9_\.]/i.test(filename) && pathUtils.extname(filename) != '.js')
         {
-          var requirePath = nsRootPath[namespaceRoot];
+          // namespace, like 'foo.bar.baz'
+          var namespace = filename;
+          var namespaceRoot = namespace.split('.')[0];
 
-          if (!/^\//.test(requirePath))
-            throw 'Path `' + namespace + '` (' + requirePath + ') can\'t be resolved';
+          filename = namespace.replace(/\./g, '/') + '.js';
 
-          if (!requested[namespace])
-            requested[namespace] = true;
-          else
-            throw 'Recursive require for ' + namespace;
+          if (namespaceRoot == namespace)
+          {
+            nsRootPath[namespaceRoot] = nsRootPath[namespace] || pathUtils.baseURI;
+            filename2namespace[nsRootPath[namespaceRoot] + filename] = namespaceRoot;
+          }
 
-          var requestUrl = requirePath + filename;
-
-
-          var ns = getNamespace(namespace);
-          var sourceCode = getResourceContent(requestUrl);
-
-          /** @cut */ var savedRequires = requires;
-          /** @cut */ requires = [];
-
-          runScriptInContext(ns, requestUrl, sourceCode);
-          complete(ns, ns.exports);
-
-          /** @cut */ ns.filename_ = requestUrl;
-          /** @cut */ ns.source_ = sourceCode;
-          /** @cut */ ns.requires_ = requires;
-
-          /** @cut */ requires = savedRequires;
+          filename = (nsRootPath[namespaceRoot] || '') + filename;
         }
+        else
+        {
+          filename = pathUtils.resolve(dirname, filename);
+        }
+
+        return getResource(filename).fetch();
       };
     }
   })();
+
+  //
+  // Buildin classes extension
+  //
+
+  function extendProto(cls, extensions){
+    if (config.extProto)
+      for (var key in extensions)
+        cls.prototype[key] = (function(method, clsName){
+          return function(){
+            /** @cut */ if (config.extProto == 'warn')
+            /** @cut */   consoleMethods.warn(clsName + '#' + method + ' is not a standard method, and it\'s and will be removed soon; use basis.' + clsName.toLowerCase() + '.' + method + ' instead');
+
+            var args = [this];
+            Array.prototype.push.apply(args, arguments);
+            return extensions[method].apply(extensions, args);
+          }
+        })(key, cls.name);
+  }
 
 
  /**
@@ -2293,19 +2402,13 @@
     }
   });
 
-  extend(Array.prototype, {
+  var Array_extensions = {
     // extractors
-    flatten: function(){
-      return this.concat.apply([], this);
+    flatten: function(this_){
+      return this_.concat.apply([], this_);
     },
-    repeat: function(count){
-      return createArray(parseInt(count, 10) || 0, this).flatten();
-    },
-
-    // getters
-    item: function(index){
-      index = parseInt(index || 0, 10);
-      return this[index >= 0 ? index : this.length + index];
+    repeat: function(this_, count){
+      return Array_extensions.flatten(createArray(parseInt(count, 10) || 0, this_));
     },
 
     // search
@@ -2328,7 +2431,7 @@
     *   while (item)
     *   {
     *     result.push(item)
-    *     item = list.search(1, 'a', Array.lastSearchIndex + 1);
+    *     item = list.search(1, 'a', list.lastSearchIndex + 1);
     *                                   // lastSearchIndex store index of last founded item
     *   }
     *     // result -> [{ a: 1, b: 2 }, { a: 1, b: 4}]
@@ -2341,13 +2444,13 @@
     * @param {number=} offset
     * @return {*}
     */
-    search: function(value, getter_, offset){
-      Array.lastSearchIndex = -1;
+    search: function(this_, value, getter_, offset){
+      this_.lastSearchIndex = -1;
       getter_ = getter(getter_ || $self);
 
-      for (var index = parseInt(offset, 10) || 0, len = this.length; index < len; index++)
-        if (getter_(this[index]) === value)
-          return this[Array.lastSearchIndex = index];
+      for (var index = parseInt(offset, 10) || 0, len = this_.length; index < len; index++)
+        if (getter_(this_[index]) === value)
+          return this_[this_.lastSearchIndex = index];
     },
 
    /**
@@ -2356,84 +2459,36 @@
     * @param {number=} offset
     * @return {*}
     */
-    lastSearch: function(value, getter_, offset){
-      Array.lastSearchIndex = -1;
+    lastSearch: function(this_, value, getter_, offset){
+      this_.lastSearchIndex = -1;
       getter_ = getter(getter_ || $self);
 
-      var len = this.length;
+      var len = this_.length;
       var index = isNaN(offset) || offset == null ? len : parseInt(offset, 10);
 
       for (var i = index > len ? len : index; i-- > 0;)
-        if (getter_(this[i]) === value)
-          return this[Array.lastSearchIndex = i];
-    },
-
-   /**
-    * Binary search in ordered array where getter(item) === value and return position.
-    * When strong parameter equal false insert position returns.
-    * Otherwise returns position of founded item, but -1 if nothing found.
-    * @param {*} value Value search for
-    * @param {function(object)|string=} getter_
-    * @param {boolean=} desc Must be true for reverse sorted arrays.
-    * @param {boolean=} strong If true - returns result only if value found.
-    * @param {number=} left Min left index. If omit it equals to zero.
-    * @param {number=} right Max right index. If omit it equals to array length.
-    * @return {number}
-    */
-    binarySearchPos: function(value, getter_, desc, strong, left, right){
-      if (!this.length)  // empty array check
-        return strong ? -1 : 0;
-
-      getter_ = getter(getter_ || $self);
-      desc = !!desc;
-
-      var pos, compareValue;
-      var l = isNaN(left) ? 0 : left;
-      var r = isNaN(right) ? this.length - 1 : right;
-
-      do
-      {
-        pos = (l + r) >> 1;
-        compareValue = getter_(this[pos]);
-        if (desc ? value > compareValue : value < compareValue)
-          r = pos - 1;
-        else
-          if (desc ? value < compareValue : value > compareValue)
-            l = pos + 1;
-          else
-            return value == compareValue ? pos : (strong ? -1 : 0);  // founded element
-                                                      // -1 returns when it seems as founded element,
-                                                      // but not equal (array item or value looked for have wrong data type for compare)
-      }
-      while (l <= r);
-
-      return strong ? -1 : pos + ((compareValue < value) ^ desc);
-    },
-    binarySearch: function(value, getter){ // position of value
-      return this.binarySearchPos(value, getter, false, true);
+        if (getter_(this_[i]) === value)
+          return this_[this_.lastSearchIndex = i];
     },
 
     // collection for
-    add: function(value){
-      return this.indexOf(value) == -1 && !!this.push(value);
+    add: function(this_, value){
+      return this_.indexOf(value) == -1 && !!this_.push(value);
     },
-    remove: function(value){
-      var index = this.indexOf(value);
-      return index != -1 && !!this.splice(index, 1);
+    remove: function(this_, value){
+      var index = this_.indexOf(value);
+      return index != -1 && !!this_.splice(index, 1);
     },
-    has: function(value){
-      return this.indexOf(value) != -1;
+    has: function(this_, value){
+      return this_.indexOf(value) != -1;
     },
 
     // misc.
-    merge: function(object){
-      return this.reduce(extend, object || {});
-    },
-    sortAsObject: function(getter_, comparator, desc){
+    sortAsObject: function(this_, getter_, comparator, desc){
       getter_ = getter(getter_);
       desc = desc ? -1 : 1;
 
-      return this
+      return this_
         .map(function(item, index){
                return {
                  i: index,       // index
@@ -2442,22 +2497,13 @@
              })                                                                           // stability sorting (neccessary only for browsers with no strong sorting, just for sure)
         .sort(comparator || function(a, b){ return desc * ((a.v > b.v) || -(a.v < b.v) || (a.i > b.i ? 1 : -1)); })
         .map(function(item){
-               return this[item.i];
-             }, this);
-    },
-    set: function(array){
-      if (this !== array)
-      {
-        this.length = 0;
-        this.push.apply(this, array);
-      }
-      return this;
-    },
-    clear: function(){
-      this.length = 0;
-      return this;
+               return this_[item.i];
+             }, this_);
     }
-  });
+  };
+
+  // it's prohibited and will be removed soon
+  extendProto(Array, Array_extensions);
 
   // IE 5.5+ & Opera
   // when second argument is omited, method set this parameter equal zero (must be equal array length)
@@ -2477,25 +2523,8 @@
   * @namespace String
   */
 
-  var STRING_QUOTE_PAIRS = { '<': '>', '[': ']', '(': ')', '{': '}', '\xAB': '\xBB' };
   var ESCAPE_FOR_REGEXP = /([\/\\\(\)\[\]\?\{\}\|\*\+\-\.\^\$])/g;
   var FORMAT_REGEXP = /\{([a-z\d_]+)(?::([\.0])(\d+)|:(\?))?\}/gi;
-  var QUOTE_REGEXP_CACHE = {};
-
-  var Entity = {
-    laquo:  '\xAB',
-    raquo:  '\xBB',
-    nbsp:   '\xA0',
-    quot:   '\x22',
-    quote:  '\x22',
-    copy:   '\xA9',
-    shy:    '\xAD',
-    para:   '\xB6',
-    sect:   '\xA7',
-    deg:    '\xB0',
-    mdash:  '\u2014',
-    hellip: '\u2026'
-  };
 
   function isEmptyString(value){
     return value == null || String(value) == '';
@@ -2540,50 +2569,37 @@
     }
   });
 
-  extend(String.prototype, {
+  var String_extensions = {
    /**
     * @return {*}
     */
-    toObject: function(rethrow){
-      // try { return eval('0,' + this) } catch(e) {}
+    toObject: function(this_, rethrow){
+      // try { return eval('0,' + this_) } catch(e) {}
       // safe solution with no eval:
       try {
-        return new Function('return 0,' + this)();
+        return new Function('return 0,' + this_)();
       } catch(e) {
         if (rethrow)
           throw e;
       }
     },
-    toArray: ('a'.hasOwnProperty('0')
-      ? function(){
-          return arrayFrom(this);
-        }
-      // IE Array and String are not generics
-      : function(){
-          var result = [];
-          var len = this.length;
-          for (var i = 0; i < len; i++)
-            result[i] = this.charAt(i);
-          return result;
-        }
-    ),
-    repeat: function(count){
-      return (new Array(parseInt(count, 10) + 1 || 0)).join(this);
+    repeat: function(this_, count){
+      return (new Array(parseInt(count, 10) + 1 || 0)).join(this_);
     },
-    qw: function(){
-      var trimmed = this.trim();
+    qw: function(this_){
+      var trimmed = this_.trim();
       return trimmed ? trimmed.split(/\s+/) : [];
     },
-    forRegExp: function(){
-      return this.replace(ESCAPE_FOR_REGEXP, "\\$1");
+    forRegExp: function(this_){
+      return this_.replace(ESCAPE_FOR_REGEXP, "\\$1");
     },
-    format: function(first){
-      var data = arguments;
+    format: function(this_, first){
+      var data = arrayFrom(arguments, 1);
 
       if (typeof first == 'object')
         extend(data, first);
 
-      return this.replace(FORMAT_REGEXP,
+      return this_.replace(FORMAT_REGEXP,
         function(m, key, numFormat, num, noNull){
           var value = key in data ? data[key] : (noNull ? '' : m);
           if (numFormat && !isNaN(value))
@@ -2591,71 +2607,60 @@
             value = Number(value);
             return numFormat == '.'
               ? value.toFixed(num)
-              : value.lead(num);
+              : Number_extensions.lead(value, num);
           }
           return value;
         }
       );
     },
-    quote: function(quoteS, quoteE){
-      quoteS = quoteS || '"';
-      quoteE = quoteE || STRING_QUOTE_PAIRS[quoteS] || quoteS;
-      var rx = (quoteS.length == 1 ? quoteS : '') + (quoteE.length == 1 ? quoteE : '');
-      return quoteS + (rx ? this.replace(QUOTE_REGEXP_CACHE[rx] || (QUOTE_REGEXP_CACHE[rx] = new RegExp('[' + rx.forRegExp() + ']', 'g')), "\\$&") : this) + quoteE;
+    capitalize: function(this_){
+      return this_.charAt(0).toUpperCase() + this_.substr(1).toLowerCase();
     },
-    capitalize: function(){
-      return this.charAt(0).toUpperCase() + this.substr(1).toLowerCase();
+    camelize: function(this_){
+      return this_.replace(/-(.)/g, function(m, chr){ return chr.toUpperCase(); });
     },
-    camelize: function(){
-      return this.replace(/-(.)/g, function(m, chr){ return chr.toUpperCase(); });
-    },
-    dasherize: function(){
-      return this.replace(/[A-Z]/g, function(m){ return '-' + m.toLowerCase(); });
+    dasherize: function(this_){
+      return this_.replace(/[A-Z]/g, function(m){ return '-' + m.toLowerCase(); });
     }
-  });
+  };
+
+  // it's prohibited and will be removed soon
+  extendProto(String, String_extensions);
 
 
   // Fix some methods
   // ----------------
-  // IE 5.0+ fix
+  // IE 5.0-8.0 fix
   // 1. result array without null elements
   // 2. when parenthesis uses, result array with no parenthesis value
   if ('|||'.split(/\|/).length + '|||'.split(/(\|)/).length != 11)
   {
+    var nativeStringSplit = String.prototype.split;
     String.prototype.split = function(pattern, count){
-      if (pattern == '' || (pattern && pattern.source == ''))
-        return this.toArray();
+      if (!pattern || pattern instanceof RegExp == false || pattern.source == '')
+        return nativeStringSplit.apply(this, arguments);
 
       var result = [];
       var pos = 0;
       var match;
 
-      if (pattern instanceof RegExp)
-      {
-        if (!pattern.global)
-          pattern = new RegExp(pattern.source, /\/([mi]*)$/.exec(pattern)[1] + 'g');
+      if (!pattern.global)
+        pattern = new RegExp(pattern.source, /\/([mi]*)$/.exec(pattern)[1] + 'g');
 
-        while (match = pattern.exec(this))
-        {
-          match[0] = this.substring(pos, match.index);
-          result.push.apply(result, match);
-          pos = pattern.lastIndex;
-        }
-      }
-      else
+      while (match = pattern.exec(this))
       {
-        while ((match = this.indexOf(pattern, pos)) != -1)
-        {
-          result.push(this.substring(pos, match));
-          pos = match + pattern.length;
-        }
+        match[0] = this.substring(pos, match.index);
+        result.push.apply(result, match);
+        pos = pattern.lastIndex;
       }
+
       result.push(this.substr(pos));
+
       return result;
     };
   }
 
-  // IE fix
+  // IE 5.0-8.0 fix
   if ('12'.substr(-1) != '2')
   {
     var nativeStringSubstr = String.prototype.substr;
@@ -2670,46 +2675,31 @@
   * @namespace Number.prototype
   */
 
-  extend(Number.prototype, {
-    fit: function(min, max){
-      if (!isNaN(min) && this < min)
+  var Number_extensions = {
+    fit: function(this_, min, max){
+      if (!isNaN(min) && this_ < min)
         return Number(min);
-      if (!isNaN(max) && this > max)
+      if (!isNaN(max) && this_ > max)
         return Number(max);
-      return this;
+      return this_;
     },
-    between: function(min, max){
-      return !isNaN(this) && this >= min && this <= max;
-    },
-    quote: function(start, end){
-      return (this + '').quote(start, end);
-    },
-    toHex: function(){
-      return parseInt(this, 10).toString(16).toUpperCase();
-    },
-    sign: function(){
-      return this < 0 ? -1 : +(this > 0);
-    },
-    base: function(div){
-      return !div || isNaN(div) ? 0 : Math.floor(this/div) * div;
-    },
-    lead: function(len, leadChar){
+    lead: function(this_, len, leadChar){
       // convert to string and lead first digits by leadChar
-      return (this + '').replace(/\d+/, function(number){
+      return (this_ + '').replace(/\d+/, function(number){
         // substract number length from desired length converting len to Number and indicates how much leadChars we need to add
         // here is no isNaN(len) check, because comparation of NaN and a Number is always false
         return (len -= number.length - 1) > 1 ? new Array(len).join(leadChar || 0) + number : number;
       });
     },
-    group: function(len, splitter){
-      return (this + '').replace(/\d+/, function(number){
+    group: function(this_, len, splitter){
+      return (this_ + '').replace(/\d+/, function(number){
         return number.replace(/\d/g, function(m, pos){
           return !pos + (number.length - pos) % (len || 3) ? m : (splitter || ' ') + m;
         });
       });
     },
-    format: function(prec, gs, prefix, postfix, comma){
-      var res = this.toFixed(prec);
+    format: function(this_, prec, gs, prefix, postfix, comma){
+      var res = this_.toFixed(prec);
       if (gs || comma)
         res = res.replace(/(\d+)(\.?)/, function(m, number, c){
           return (gs ? Number(number).group(3, gs) : number) + (c ? comma || c : '');
@@ -2718,11 +2708,14 @@
         res = res.replace(/^-?/, '$&' + (prefix || ''));
       return res + (postfix || '');
     }
-  });
+  };
+
+  // it's prohibited and will be removed soon
+  extendProto(Number, Number_extensions);
 
 
   // ============================================
-  // Date (other extensions & fixes moved to date.js)
+  // Date (other extensions & fixes moved to basis.date)
   //
 
  /**
@@ -2744,22 +2737,6 @@
     }
   });
 
- /**
-  * @namespace Date.prototype
-  */
-
-  if ((new Date).getYear() < 1900)
-  {
-    extend(Date.prototype, {
-      getYear: function(){
-        return this.getFullYear() - 1900;
-      },
-      setYear: function(year){
-        return this.setFullYear(!isNaN(year) && year < 100 ? Number(year) + 1900 : year);
-      }
-    });
-  }
-
 
   // ============================================
   // Main part
@@ -2772,18 +2749,21 @@
 
  /**
   * Attach document ready handlers
-  * @function
   * @param {function()} handler 
   * @param {*} thisObject Context for handler
   */
   var ready = (function(){
     // Matthias Miller/Mark Wubben/Paul Sowden/Dean Edwards/John Resig/Roman Dvornov
 
-    var fired = !document || document.readyState == 'complete';
+    function isReady(){
+      return document.readyState == 'complete' && !!document.body;
+    }
+
+    var fired = !document || isReady();
     var deferredHandler;
 
     function fireHandlers(){
-      if (document.readyState == 'complete')
+      if (isReady())
         if (!fired++)
           while (deferredHandler)
           {
@@ -2850,6 +2830,111 @@
 
 
  /**
+  * Document interface for safe add/remove nodes to/from head and body.
+  */  
+  var documentInterface = (function(){
+    var timer;
+    var reference = {};
+    var callbacks = {
+      head: [],
+      body: []
+    };
+
+    function getParent(name){
+      if (document && !reference[name])
+      {
+        reference[name] = document[name] || document.getElementsByTagName(name)[0];
+
+        if (reference[name])
+        {
+          var items = callbacks[name];
+          delete callbacks[name];
+          for (var i = 0, cb; cb = items[i]; i++)
+            cb[0].call(cb[1], reference[name]);
+        }
+      }
+
+      return reference[name];
+    }
+
+    function add(){
+      var name = this[0];
+      var node = this[1];
+      var ref = this[2];
+
+      remove(node);
+
+      var parent = getParent(name);
+      if (parent)
+      {
+        if (ref === true)
+          ref = parent.firstChild;
+
+        if (!ref || ref.parentNode !== parent)
+          ref = null;
+
+        parent.insertBefore(node, ref);
+      }
+      else
+        callbacks[name].push([add, [name, node, ref]])
+    }
+
+    function docReady(name, fn, context){
+      if (callbacks[name])
+        callbacks[name].push([fn, context]);
+      else
+        fn.call(context);
+    }
+
+    function remove(node){
+      for (var key in callbacks)
+      {
+        var entry = Array_extensions.search(callbacks[key], node, function(item){
+          return item[1] && item[1][1];
+        });
+
+        if (entry)
+          Array_extensions.remove(callbacks[key], entry);
+      }
+
+      if (node && node.parentNode && node.parentNode.nodeType == 1)
+        node.parentNode.removeChild(node);
+    }
+
+    function checkParents(){
+      if (getParent('head') && getParent('body'))
+        clearInterval(timer);
+    }
+
+    if (document)
+    {
+      timer = setInterval(checkParents, 5);
+      ready(checkParents);
+    }
+
+    return {
+      head: {
+        ready: function(fn, context){
+          docReady('head', fn, context);
+        },
+        add: function(node, ref){
+          add.call(['head', node, ref]);
+        }
+      },
+      body: {
+        ready: function(fn, context){
+          docReady('body', fn, context);
+        },        
+        add: function(node, ref){
+          add.call(['body', node, ref]);
+        }
+      },
+      remove: remove
+    };
+  })();
+
+
+ /**
   * @namespace basis
   */
 
@@ -2871,7 +2956,7 @@
         if (typeof object.destroy == 'function')
         {
           try {
-            ;;;if (logDestroy) consoleMethods.log('destroy', String(object.className).quote('['), object);
+            ;;;if (logDestroy) consoleMethods.log('destroy', '[' + String(object.className) + ']', object);
             object.destroy();
           } catch(e) {
             ;;;consoleMethods.warn(String(object), e);
@@ -2883,7 +2968,7 @@
             object[prop] = null;
         }
       }
-      objects.clear();
+      objects.length = 0;
     }
 
     if ('attachEvent' in global)
@@ -2903,7 +2988,7 @@
           objects.push(object);
       },
       remove: function(object){
-        objects.remove(object);
+        Array_extensions.remove(objects, object);
       }
     };
 
@@ -2916,16 +3001,199 @@
 
 
   //
+  // CSS resource
+  //
+
+  var CssResource = (function(){
+    var cssResources = {};
+    var cleanupDom = true; // is require remove style node on CssResource destroy or not
+
+    // Test for appendChild bugs (old IE browsers has a problem with append textNode into <style>)
+    var STYLE_APPEND_BUGGY = (function(){
+      try {
+        return !document.createElement('style').appendChild(
+          document.createTextNode('')
+        );
+      } catch(e) {
+        return true;
+      }
+    })();
+
+    // cleanup on page unload
+    cleaner.add({
+      destroy: function(){
+        cleanupDom = false; // don't need remove unused style on global destroy
+
+        for (var url in cssResources)
+          cssResources[url].destroy();
+
+        cssResources = null;
+      }
+    });
+
+
+   /**
+    * Helper functions for path resolving
+    */
+    var baseEl = document && document.createElement('base');
+
+    function setBase(baseURI){
+      // Opera and IE doesn't resolve pathes correctly, if base href is not an absolute path
+      // convert path to absolute value
+      baseEl.setAttribute('href', baseURI);
+
+      // if more than one <base> elements in document, only first has effect
+      // put our <base> resolver at the begining of <head>
+      documentInterface.head.add(baseEl, true);
+    }
+
+    function restoreBase(){
+      // Opera left document base as <base> element specified,
+      // even if this element is removed from document
+      // so we set current location for base
+      baseEl.setAttribute('href', location.href);
+
+      documentInterface.remove(baseEl);
+    }
+
+    // inject style into document
+    function injectStyleToHead(){
+      // set base before <style> element creating, because IE9+ set baseURI
+      // for <style> element on element creation
+      setBase(this.baseURI);
+
+      // create <style> element for first time
+      if (!this.element)
+      {
+        this.element = document.createElement('style');
+
+        if (!STYLE_APPEND_BUGGY)
+          this.textNode = this.element.appendChild(document.createTextNode(''));
+
+        /** @cut */ this.element.setAttribute('src', pathUtils.relative(this.url));
+      }
+
+      // add element to document
+      documentInterface.head.add(this.element);
+      
+      // set css text after node inserted into document,
+      // IE8 and lower crash otherwise (this.element.styleSheet is not defined)
+      this.syncCssText();
+
+      restoreBase();
+    }
+
+
+   /**
+    * @class
+    */
+    var CssResource = Class(null, {
+      className: 'basis.CssResource',
+
+      inUse: 0,
+
+      url: '',
+      baseURI: '',
+      cssText: '',
+
+      resource: null,
+      element: null,
+      textNode: null,
+
+      init: function(url){
+        this.url = pathUtils.resolve(url);
+        this.baseURI = pathUtils.dirname(url) + '/';
+
+        cssResources[url] = this;
+      },
+
+      updateCssText: function(cssText){
+        if (this.cssText != cssText)
+        {
+          this.cssText = cssText;
+          if (this.inUse && this.element)
+          {
+            setBase(this.baseURI);
+            this.syncCssText();
+            restoreBase();
+          }
+        }
+      },
+
+      syncCssText: function(){
+        if (this.textNode)
+        {
+          // W3C browsers
+          this.textNode.nodeValue = this.cssText;
+        }
+        else
+        {
+          // old IE
+          this.element.styleSheet.cssText = this.cssText;
+        }
+      },
+
+      startUse: function(){
+        if (!this.inUse)
+        {
+          if (!this.resource)
+          {
+            var resource = getResource(this.url);
+
+            this.resource = resource;
+            this.cssText = resource.get(true);
+          }
+
+          documentInterface.head.ready(injectStyleToHead, this); 
+        }
+
+        this.inUse += 1;
+      },
+
+      stopUse: function(){
+        if (this.inUse)
+        {
+          // decrease usage count
+          this.inUse -= 1;
+
+          // remove element if nobody use it
+          if (!this.inUse && this.element)
+            documentInterface.remove(this.element);
+        }
+      },
+
+      destroy: function(){
+        if (this.element && cleanupDom)
+          documentInterface.remove(this.element);
+
+        this.element = null;
+        this.textNode = null;
+        this.resource = null;
+        this.cssText = null;
+      }
+    });
+
+    CssResource.resources = cssResources;
+
+    return CssResource;
+  })();
+
+
+  //
   // export names
   //
 
   // create and extend basis namespace
   var basis = getNamespace('basis').extend({
-    filename_: basisFilename,
+    /** @cut */ filename_: basisFilename,
+
+    version: VERSION,
 
     NODE_ENV: NODE_ENV,
     config: config,
     platformFeature: {},
+
+    path: pathUtils,
 
     namespace: getNamespace,
     require: requireNamespace,
@@ -2950,6 +3218,7 @@
     cleaner: cleaner,
     console: consoleMethods,
 
+    doc: documentInterface,
     object: {
       extend: extend,
       complete: complete,
@@ -2958,8 +3227,7 @@
       slice: slice,
       splice: splice,
       merge: merge,
-      iterate: iterate,
-      coalesce: coalesce
+      iterate: iterate
     },
     fn: {
       // test functions
@@ -2981,53 +3249,37 @@
       // getters and modificators
       getter: getter,
       nullGetter: nullGetter,
-      def: def,
       wrapper: wrapper,
 
       // lazy
       lazyInit: lazyInit,
       lazyInitAndRun: lazyInitAndRun,
-      runOnce: runOnce,
-      body: functionBody
+      runOnce: runOnce
     },
-    array: extend(arrayFrom, {
+    array: extend(arrayFrom, merge(Array_extensions, {
       from: arrayFrom,
       create: createArray
-    }),
-    string: {
-      entity: Entity,
+    })),
+    string: merge(String_extensions, {
       isEmpty: isEmptyString,
-      isNotEmpty: isNotEmptyString,
-      format: String.prototype.format
-    },
+      isNotEmpty: isNotEmptyString
+    }),
+    number: Number_extensions,
     bool: {
       invert: function(value){
         return !value;
       }
+    },
+    json: {
+      parse: typeof JSON != 'undefined'
+        ? JSON.parse
+        : String_extensions.toObject
     }
   });
 
   // add dev namespace, host for special functionality in development environment
   getNamespace('basis.dev').extend(consoleMethods);
-
-  // TODO: rename path->stmElse and add path to exports
-  basis.path = pathUtils;
-
-
-  //
-  // basis extenstions
-  //
-
-  if (config.extClass)
-  {
-    /** @cut */ consoleMethods.warn('Extension of build classes by custom functions (i.e. Object.*, Array.*, String.*, Function.*) is deprecated, but extends by default until 0.10 version; use `extClass: false` in basis.js config to prevent buildin class extenstion and make code ready to new basis.js versions');
-
-    extend(Object, basis.object);
-    extend(Function, basis.fn);
-    extend(Array, basis.array);
-    extend(String, basis.string);
-  }
-
+  
 
   //
   // auto load section

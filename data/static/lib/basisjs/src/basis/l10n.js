@@ -1,4 +1,7 @@
 
+  basis.require('basis.event');
+
+
  /**
   * @namespace basis.l10n
   */
@@ -11,15 +14,61 @@
   //
 
   var Class = basis.Class;
-  var arrayFrom = basis.array.from;
+  var hasOwnProperty = Object.prototype.hasOwnProperty;
+  var Emitter = basis.event.Emitter;
 
+
+  // process .l10n files as .json
+  basis.resource.extensions['.l10n'] = basis.resource.extensions['.json'];
+
+  // get own object keys
+  function ownKeys(object){
+    var result = [];
+
+    for (var key in object)
+      if (hasOwnProperty.call(object, key))
+        result.push(key);
+
+    return result;
+  }
 
   //
   // Token
   //
 
   var tokenIndex = [];
+  var tokenComputeFn = {};
+  var tokenComputes = {};
 
+
+ /**
+  * @class
+  */ 
+  var ComputeToken = Class(basis.Token, {
+    className: namespace + '.ComputeToken',
+
+   /**
+    * @constructor
+    */ 
+    init: function(value, token){
+      token.computeTokens[this.basisObjectId] = this;
+      this.token = token;
+      this.get = token.computeGetMethod;
+
+      basis.Token.prototype.init.call(this, value);
+    },
+
+    toString: function(){
+      return this.get();
+    },
+
+    destroy: function(){    
+      delete this.token.computeTokens[this.basisObjectId];
+      this.token = null;
+
+      basis.Token.prototype.destroy.call(this);
+    }
+  });
 
  /**
   * @class
@@ -28,47 +77,196 @@
     className: namespace + '.Token',
 
    /**
+    * @type {number}
+    */ 
+    index: NaN,
+
+   /**
+    * @type {basis.l10n.Dictionary}
+    */
+    dictionary: null,
+
+   /**
+    * @type {string}
+    */
+    name: '',
+
+   /**
+    * enum default, plural, markup
+    */ 
+    type: 'default',
+
+   /**
+    *
+    */ 
+    computeTokens: null,
+
+   /**
     * @constructor
     */ 
-    init: function(dictionary, tokenName){
-      basis.Token.prototype.init.call(this, null);
+    init: function(dictionary, tokenName, type, value){
+      basis.Token.prototype.init.call(this, value);
 
-      this.dictionary = dictionary;
+      this.index = tokenIndex.push(this) - 1;
       this.name = tokenName;
+      this.dictionary = dictionary;
+      this.computeTokens = {};
 
-      tokenIndex.push(this);
+      if (type)
+        this.setType(type);
+      else
+        this.apply();
     },
 
     toString: function(){
-      return this.value;
+      return this.get();
+    },
+
+    computeGetMethod: function(){
+    },
+
+    apply: function(){
+      var values = {};
+      var tokens = this.computeTokens;
+      var get = this.type == 'plural'
+        ? function(){
+            return values[cultures[currentCulture].plural(this.value)];
+          }
+        : function(){
+            return values[this.value];
+          };
+
+      this.computeGetMethod = get;
+
+      if ((this.type == 'plural' && Array.isArray(this.value)) 
+          || (this.type == 'default' && typeof this.value == 'object'))
+        values = basis.object.slice(this.value, ownKeys(this.value));
+
+      for (var key in tokens)
+      {
+        var computeToken = tokens[key];
+        var curValue = computeToken.get();
+        var newValue = get.call(computeToken);
+
+        computeToken.get = get;
+
+        if (curValue !== newValue)
+          computeToken.apply();
+      }
+
+      basis.Token.prototype.apply.call(this);
+    },
+
+    setType: function(type){
+      if (type != 'plural' && (!basis.l10n.enableMarkup || type != 'markup'))
+        type = 'default';
+
+      if (this.type != type)
+      {
+        this.type = type;
+        this.apply();
+      }
+    },
+
+    compute: function(events, getter){
+      if (arguments.length == 1)
+      {
+        getter = events;
+        events = '';
+      }
+
+      getter = basis.getter(getter);
+      events = String(events).trim().split(/\s+|\s*,\s*/).sort();
+
+      var tokenId = this.basisObjectId;
+      var enumId = events.concat(tokenId, getter.basisGetterId_).join('_');
+
+      if (tokenComputeFn[enumId])
+        return tokenComputeFn[enumId];
+
+      var token = this;
+      var objectTokenMap = {};
+      var updateValue = function(object){
+        this.set(getter(object));
+      };
+      var handler = {
+        destroy: function(object){
+          delete objectTokenMap[object.basisObjectId];
+          this.destroy();
+        }
+      };
+
+      for (var i = 0, eventName; eventName = events[i]; i++)
+        if (eventName != 'destroy')
+          handler[eventName] = updateValue;
+
+      return tokenComputeFn[enumId] = function(object){
+        if (object instanceof Emitter == false)
+          throw 'basis.l10n.Token#compute: object must be an instanceof Emitter';
+
+        var objectId = object.basisObjectId;
+        var computeToken = objectTokenMap[objectId];
+
+        if (!computeToken)
+        {
+          computeToken = objectTokenMap[objectId] = new ComputeToken(getter(object), token);
+          object.addHandler(handler, computeToken);
+        }
+
+        return computeToken;
+      }
+    },
+
+    computeToken: function(value){
+      return new ComputeToken(value, this);
+    },
+
+    token: function(name){
+      if (this.type == 'plural')
+        name = cultures[currentCulture].plural(name);
+
+      if (this.dictionary)
+        return this.dictionary.token(this.name + '.' + name);
+    },
+
+   /**
+    * @destructor
+    */ 
+    destroy: function(){
+      for (var key in this.computeTokens)
+        this.computeTokens[key].destroy();
+
+      this.computeTokens = null;
+      this.value = null;
+
+      basis.Token.prototype.destroy.call(this);
     }
   });
 
 
  /**
-  * Returns token for path. If more than one argument passed, arguments
-  * join by dot. Path also may be index reference, that used in production.
+  * Returns token for path. Path also may be index reference, that used in production.
   * @example
-  *   basis.l10n.token('path.to.some.token');
-  *   basis.l10n.token(namespace, 'tokenName');
-  *   basis.l10n.token(namespace, 'some.path', name);
-  * @name token
-  * @param {...string} path
-  * @return {basis.l10n.Token} Token for passed path.
+  *   basis.l10n.token('token.path@path/to/dict');  // token by name and dictionary location
+  *   basis.l10n.token('#123');  // get token by base 36 index, use in production
+  * @name basis.l10n.token
+  * @param {string} path
+  * @return {basis.l10n.Token}
   */
-  function getToken(path){
-    if (arguments.length > 1)
-      path = arrayFrom(arguments).join('.');
-
+  function resolveToken(path){
     if (path.charAt(0) == '#')
     {
-      // return token by index (using in production)
+      // return index by absolute index
       return tokenIndex[parseInt(path.substr(1), 36)];
     }
     else
     {
-      var dotIndex = path.lastIndexOf('.');
-      return getDictionary(path.substr(0, dotIndex), true).getToken(path.substr(dotIndex + 1));
+      var parts = path.match(/^(.+?)@(.+)$/);
+
+      if (parts)
+        return resolveDictionary(parts[2]).token(parts[1]);
+
+      ;;;basis.dev.warn('basis.l10n.token accepts token references in format `token.path@path/to/dict.l10n` only');
     }
   }
 
@@ -77,10 +275,27 @@
   // Dictionary
   //
 
-  var dictionaryLocations = {};
-  var resourcesLoaded = {};
-  var dictionaries = {};
+  var dictionaries = [];
+  var dictionaryByLocation = {};
   var dictionaryUpdateListeners = [];
+
+  function walkTokens(dictionary, culture, tokens, path){
+    var cultureValues = dictionary.cultureValues[culture];
+
+    path = path ? path + '.' : '';
+
+    for (var name in tokens)
+      if (hasOwnProperty.call(tokens, name))
+      {
+        var tokenName = path + name;
+        var tokenValue = tokens[name];
+
+        cultureValues[tokenName] = tokenValue;
+
+        if (tokenValue && (typeof tokenValue == 'object' || Array.isArray(tokenValue)))
+          walkTokens(dictionary, culture, tokenValue, tokenName);
+      }
+  }
 
 
  /**
@@ -89,59 +304,103 @@
   var Dictionary = Class(null, {
     className: namespace + '.Dictionary',
 
-    name: '[noname]',
+   /**
+    * Token map.
+    * @type {object}
+    */ 
     tokens: null,
-    resources: null,
+
+   /**
+    * @type {object}
+    */
+    types: null, 
+
+   /**
+    * Values by cultures
+    * @type {object}
+    */ 
+    cultureValues: null,
+
+   /**
+    * @type {number}
+    */ 
+    index: NaN,
+
+   /**
+    * Token data source
+    * @type {basis.resource}
+    */
+    resource: null, 
 
    /**
     * @constructor
     * @param {string} name Dictionary name
     */ 
-    init: function(name){
-      this.name = name;
+    init: function(resource){
       this.tokens = {};
-      this.resources = {};
+      this.types = {};
+      this.cultureValues = {};
+
+      // attach to resource
+      this.resource = resource;
+      this.update(resource());
+      resource.attach(this.update, this);
+
+      // add to dictionary list
+      this.index = dictionaries.push(this) - 1;
+
+      // notify dictionary created
+      createDictionaryNotifier.set(resource.url);
     },
 
    /**
-    * @param {string} culture Culture name
-    * @param {object} tokens Object that contains new tokens data
+    * @param {object} data Object that contains new tokens data
     */ 
-    update: function(culture, tokens){
+    update: function(data){
+      if (!data)
+        data = {};
+
+      // reset old data
+      this.cultureValues = {};
+
+      // apply token values
+      for (var culture in data)
+        if (!/^_|_$/.test(culture)) // ignore names with underscore in the begining or ending (reserved for meta)
+        {
+          this.cultureValues[culture] = {};
+          walkTokens(this, culture, data[culture]);
+        }
+
+      // apply types
+      this.types = (data._meta && data._meta.type) || {};
+      for (var key in this.tokens)
+        this.tokens[key].setType(this.types[key]);
+
+      // update values
+      this.syncValues();
+    },
+
+   /**
+    * Sync token values according to current culture and it's fallback.
+    */ 
+    syncValues: function(){
       for (var tokenName in this.tokens)
-        if (!tokens[tokenName])
-          this.setCultureValue(culture, tokenName, '');
-
-      for (var tokenName in tokens)
-        this.setCultureValue(culture, tokenName, tokens[tokenName]);
+        this.tokens[tokenName].set(this.getValue(tokenName));
     },
 
    /**
-    * @param {string} culture Culture name
+    * Get current value for tokenName according to current culture and it's fallback.
+    * @param {string} tokenName
     */ 
-    setCulture: function(culture){
-      for (var tokenName in this.tokens)
-        this.setTokenValue(culture, tokenName);
-    },
+    getValue: function(tokenName){
+      var fallback = cultureFallback[currentCulture];
 
-   /**
-    * @param {string} culture Culture name
-    * @param {string} tokenName Token name
-    * @return {*}
-    */ 
-    getTokenValue: function(culture, tokenName){
-      return this.getCultureValue(culture, tokenName) || this.getCultureValue('base', tokenName);
-    },
-
-   /**
-    * @param {string} culture Culture name
-    * @param {string} tokenName Token name
-    */ 
-    setTokenValue: function(culture, tokenName){
-      this.tokens[tokenName].set(cultureGetTokenValue[culture]
-        ? cultureGetTokenValue[culture].call(this, tokenName)
-        : this.getTokenValue(culture, tokenName)
-      );
+      for (var i = 0, cultureName; cultureName = fallback[i]; i++)
+      {
+        var cultureValues = this.cultureValues[cultureName];
+        if (cultureValues && tokenName in cultureValues)
+          return cultureValues[tokenName];
+      }
     },
 
    /**
@@ -150,37 +409,27 @@
     * @return {*}
     */ 
     getCultureValue: function(culture, tokenName){
-      return this.resources[culture] && this.resources[culture][tokenName];
-    },    
-
-   /**
-    * @param {string} culture Culture name
-    * @param {string} tokenName Token name
-    * @param {string} tokenValue New token value
-    */ 
-    setCultureValue: function(culture, tokenName, tokenValue){
-      var resource = this.resources[culture];
-
-      if (!resource)
-        resource = this.resources[culture] = {};
-
-      resource[tokenName] = tokenValue;
-
-      if (this.tokens[tokenName] && (culture == 'base' || culture == currentCulture))
-        this.setTokenValue(currentCulture, tokenName);
+      return this.cultureValues[culture] && this.cultureValues[culture][tokenName];
     },
 
    /**
     * @param {string} tokenName Token name
-    */ 
-    getToken: function(tokenName){
-      if (tokenName in this.tokens == false)
+    * @return {basis.l10n.Token}
+    */
+    token: function(tokenName){
+      var token = this.tokens[tokenName];
+
+      if (!token)
       {
-        this.tokens[tokenName] = new Token(this, tokenName);
-        this.setTokenValue(currentCulture, tokenName);
+        token = this.tokens[tokenName] = new Token(
+          this,
+          tokenName,
+          this.types[tokenName],
+          this.getValue(tokenName)
+        );
       }
 
-      return this.tokens[tokenName];
+      return token;
     },
 
    /**
@@ -188,23 +437,25 @@
     */ 
     destroy: function(){
       this.tokens = null;
-      this.resources = null;
+      this.cultureValues = null;
+      basis.array.remove(dictionaries, this);
     }
   });
 
 
  /**
-  * @param {Array.<string>} cultureList
-  * @return {function(tokenName)}
-  */
-  function createGetTokenValueFunction(cultureList){
-    return function(tokenName){
-      for (var i = 0, culture, value; culture = cultureList[i++];)
-        if (value = this.getCultureValue(culture, tokenName))
-          return value;
+  * @param {string} location
+  * @return {basis.l10n.Dictionary}
+  */ 
+  function resolveDictionary(location){
+    var extname = basis.path.extname(location);
+    var resource = basis.resource(extname != '.l10n' ? basis.path.dirname(location) + '/' + basis.path.basename(location, extname) + '.l10n' : location);
+    var dictionary = dictionaryByLocation[resource.url];
 
-      return this.getCultureValue('base', tokenName);
-    }
+    if (!dictionary)
+      dictionary = dictionaryByLocation[resource.url] = new Dictionary(resource);
+
+    return dictionary;
   }
 
 
@@ -213,166 +464,65 @@
   * @return {Array.<basis.l10n.Dictionary>}
   */
   function getDictionaries(){
-    return dictionaries;
+    return dictionaries.slice(0);
   }
 
-
  /**
-  * Returns dictionary by name. If autoCreate is true dictionary will be created if
-  * it doesn't created yet.
-  * @param {string} dictionaryName Dictionary name
-  * @param {boolean} autoCreate Should dictionary to be created if it's now created yet.
-  * @return {basis.l10n.Dictionary}
+  * 
   */
-  function getDictionary(dictionaryName, autoCreate){
-    var dictionary = dictionaries[dictionaryName];    
-
-    if (!dictionary && autoCreate)
-      dictionary = dictionaries[dictionaryName] = new Dictionary(dictionaryName);
-
-    return dictionary;
-  }
-
-
- /**
-  * Creates new dictionary.
-  * @example
-  *   basis.l10n.createDictionary('my.dictionary.namespace', __dirname + 'l10n', {
-  *     title: 'Hello world'
-  *   });
-  * @param {string} dictionaryName Dictionary name.
-  * @param {string} location Directory where dictionary resources placed.
-  * @param {object} tokens Base tokens map.
-  */
-  function createDictionary(dictionaryName, location, tokens){
-    ;;;if (this !== module) basis.dev.warn('basis.l10n.createDictionary: Called with wrong context. Don\'t shortcut this function call, use basis.l10n.createDictionary to make build possible');
-
-    var dictionary = getDictionary(dictionaryName);
-
-    dictionary = getDictionary(dictionaryName, true);
-    dictionary.location = location;
-
-    if (Array.isArray(tokens))
-    { // packed dictionary
-      var idx = 0;
-      var token;
-      var item;
-      for (var i = 0; i < tokens.length; i++, idx++)
-      {
-        item = tokens[i];
-        if (typeof item == 'number')
-          idx += item;
-        else
-        {
-          if (token = tokenIndex[idx])
-            token.dictionary.setCultureValue('base', token.name, item);
-        }
-      }
-    }
-    else
-      dictionary.update('base', tokens);
-
-    loadCultureForDictionary(dictionary, currentCulture);
-
-    fireCreateDictionaryEvent(dictionaryName);
-  }
-
- /**
-  * Update dictionary by new tokens for some culture.
-  * @param {string} dictionaryName Dictionary name
-  * @param {string} location Directory where dictionary resources placed.
-  * @param {object} tokens Base tokens map
-  */ 
-  function updateDictionary(dictionaryName, culture, tokens){
-    getDictionary(dictionaryName, true).update(culture, tokens);
-  }
-
-
- /**
-  * @param {object|Array.<object>} dictionaryData
-  * @param {string} culture Culture name
-  * @param {string} dictionaryName Dictionary name
-  */
-  function updateDictionaryResource(dictionaryData, culture, dictionaryName){
-    if (!dictionaryData)
-      return;
-
-    if (Array.isArray(dictionaryData))
-    { // packed dictionary
-      var idx = 0;
-      var token;
-      var item;
-      for (var i = 0; i < dictionaryData.length; i++, idx++)
-      {
-        item = dictionaryData[i];
-        if (typeof item == 'number')
-          idx += item;
-        else
-        {
-          if (token = tokenIndex[idx])
-            token.dictionary.setCultureValue(culture, token.name, item);
-        }
-      }
-    }
-    else
-    {
-      if (dictionaryName)
-      {
-        if (dictionaryData[dictionaryName])
-          updateDictionary(dictionaryName, culture, dictionaryData[dictionaryName]);
-      }
-      else
-      {
-        for (var dictionaryName in dictionaryData)
-          updateDictionary(dictionaryName, culture, dictionaryData[dictionaryName]);
-      }
-    }
-  }
-
-  //
-  // update dictionary event handling
-  //
-
-  function addHandler(handler, context){
-    for (var i = 0, listener; listener = dictionaryUpdateListeners[i]; i++)
-      if (listener.handler == handler && listener.context == context)
-        return false;
-
-    dictionaryUpdateListeners.push({
-      handler: handler,
-      context: context
-    });
-
-    return true;
-  }
-
-  function removeHandler(handler, context){
-    for (var i = 0, listener; listener = dictionaryUpdateListeners[i]; i++)
-      if (listener.handler == handler && listener.context == context)
-      {
-        dictionaryUpdateListeners.splice(i, 1);
-        return true;
-      }
-
-    return false;
-  }
-
-  function fireCreateDictionaryEvent(dictionaryName){
-    for (var i = 0, listener; listener = dictionaryUpdateListeners[i]; i++)
-      listener.handler.call(listener.context, dictionaryName);
-  }
+  var createDictionaryNotifier = new basis.Token();
 
 
   //
   // Culture
   //
 
-  var currentCulture = 'base';
   var cultureList = [];
-  var cultureGetTokenValue = {};
+  var cultures = {};
   var cultureFallback = {}; 
-  var cultureChangeHandlers = [];
 
+  var currentCulture = null;
+
+
+ /**
+  * @class
+  */
+  var Culture = basis.Class(null, {
+    className: namespace + '.Culture',
+
+    name: '',
+    init: function(name){
+      this.name = name;
+
+      // temporary here
+      if (name == 'ru-RU')
+        this.plural = function(n){
+          if (n % 10 == 1 && n % 100 !=11)
+            return 0;
+          if (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20))
+            return 1;
+          return 2;
+        }
+    },
+
+    plural: function(value){
+      return Number(value) == 1 ? 0 : 1;
+    }
+  });
+
+ /**
+  * 
+  */
+  function resolveCulture(name){
+    var culture = cultures[name];
+
+    if (!culture)
+      culture = cultures[name] = new Culture(name);
+
+    return culture;
+  }
+
+  basis.object.extend(resolveCulture, new basis.Token(currentCulture));
 
  /**
   * Returns current culture name.
@@ -389,17 +539,16 @@
   */ 
   function setCulture(culture){
     if (!culture)
-      culture = 'base';
+      return;
 
     if (currentCulture != culture)
     {
       currentCulture = culture;
 
-      for (var name in dictionaries)
-        setCultureForDictionary(dictionaries[name], currentCulture);
+      for (var i = 0, dictionary; dictionary = dictionaries[i]; i++)
+        dictionary.syncValues();
 
-      for (var i = 0, handler; handler = cultureChangeHandlers[i]; i++)
-        handler.fn.call(handler.context, culture);
+      resolveCulture.set(culture);
     }
   }
 
@@ -409,12 +558,12 @@
   * @return {Array.<string>}
   */ 
   function getCultureList(){
-    return cultureList;
+    return cultureList.slice(0);
   }
 
 
  /**
-  * Set new culture list.
+  * Set new culture list. May be called only once.
   * @example
   *   basis.l10n.setCultureList(['ru-RU', 'en-US']);
   *   basis.l10n.setCultureList('ru-RU en-US');
@@ -425,72 +574,59 @@
   */
   function setCultureList(list){
     if (typeof list == 'string')
-      list = list.qw();
+      list = list.trim().split(' ');
 
-    var cultures = [];
+    if (!list.length)
+    {
+      ;;;basis.dev.warn('basis.l10n.setCultureList: culture list can\'t be empty, the culture list isn\'t changed');
+      return;
+    }
+
+    var cultures = {};
     var cultureRow;
+    var baseCulture;
 
-    for (var i = 0, culture; culture = list[i]; i++)
+    cultureFallback = {};
+
+    // process list
+    for (var i = 0, culture, cultureName; culture = list[i]; i++)
     {
       cultureRow = culture.split('/');
-      cultures.push(cultureRow[0]);
-      cultureGetTokenValue[cultureRow[0]] = createGetTokenValueFunction(cultureRow);
-      cultureFallback[cultureRow[0]] = cultureRow.slice(1);
+
+      if (cultureRow.length > 2)
+      {
+        ;;;basis.dev.warn('basis.l10n.setCultureList: only one fallback culture can be set for certain culture, try to set `' + culture+ '`; other cultures except first one was ignored');
+        cultureRow = cultureRow.slice(0, 2);
+      }
+
+      cultureName = cultureRow[0];
+
+      if (!baseCulture)
+        baseCulture = cultureName;
+
+      cultures[cultureName] = resolveCulture(cultureName);
+      cultureFallback[cultureName] = cultureRow;
     }
 
-    cultureList = cultures;
-  }
-
-
- /**
-  * @param {string} dictionary Dictionary name
-  * @param {string} culture Culture name
-  */ 
-  function setCultureForDictionary(dictionary, culture){
-    loadCultureForDictionary(dictionary, culture);
-    dictionary.setCulture(culture);
-  }
-
-
- /**
-  * Load culture resources for some dictionary
-  * @param {string} dictionary Dictionary name
-  * @param {string} culture Culture name
-  */ 
-  function loadCultureForDictionary(dictionary, culture){
-    function load(culture){
-      if (culture == 'base')
-        return;
-
-      if (!cultureList || cultureList.indexOf(culture) != -1)
-      {
-        if (!dictionary.location)
-          return;
-
-        var location = dictionary.location + '/' + culture;
-
-        var resource = basis.resource(location + '.json');
-        if (!resourcesLoaded[location])
-        {
-          resourcesLoaded[location] = true;
-          resource.attach(function(content){
-            updateDictionaryResource(content, culture);
-          });
-        }
-
-        updateDictionaryResource(resource(), culture, dictionary.name);
-      }
-      else
-      {
-        ;;;basis.dev.warn('Culture "' + culture + '" is not specified in the list');
-      }
+    // normalize fallback
+    for (var cultureName in cultureFallback)
+    {
+      cultureFallback[cultureName] = basis.array.flatten(cultureFallback[cultureName]
+        .map(function(name){
+          return cultureFallback[name];
+        }))
+        .concat(baseCulture)
+        .filter(function(item, idx, array){
+          return !idx || array.lastIndexOf(item, idx - 1) == -1;
+        });
     }
 
-    if (cultureFallback[culture]) 
-      for (var i = 0, fallbackCulture; fallbackCulture = cultureFallback[culture][i]; i++) 
-        load(fallbackCulture);
+    // update current culture list
+    cultureList = basis.object.keys(cultures);
 
-    load(culture);
+    // if current culture not in culture list, change it for base culture
+    if (currentCulture in cultures == false)
+      setCulture(baseCulture);
   }
 
 
@@ -502,14 +638,14 @@
   *   culture name right after callback attachment.
   */ 
   function onCultureChange(fn, context, fire){
-    cultureChangeHandlers.push({
-      fn: fn,
-      context: context
-    });
+    resolveCulture.attach(fn, context);
 
     if (fire)
       fn.call(context, currentCulture);
   }
+
+  setCultureList('en-US');
+  setCulture('en-US');
 
 
   //
@@ -517,25 +653,22 @@
   //
 
   module.exports = {
+    ComputeToken: ComputeToken,
     Token: Token,
-    token: getToken,
-    getToken: function(){
-      ;;;basis.dev.warn('basis.l10n.getToken is deprecated, use basis.l10n.token instead');
-      return getToken.apply(this, arguments);
-    },
+    token: resolveToken,
     
-    getDictionary: getDictionary,
-    createDictionary: createDictionary,
-    updateDictionary: updateDictionary,
+    Dictionary: Dictionary,
+    dictionary: resolveDictionary,
     /** dev */ getDictionaries: getDictionaries,
-    /** dev */ addCreateDictionaryHandler: addHandler,
-    /** dev */ removeCreateDictionaryHandler: removeHandler,
+    /** dev */ addCreateDictionaryHandler: createDictionaryNotifier.attach.bind(createDictionaryNotifier),
+    /** dev */ removeCreateDictionaryHandler: createDictionaryNotifier.detach.bind(createDictionaryNotifier),
 
+    Culture: Culture,
+    culture: resolveCulture,
     getCulture: getCulture,
     setCulture: setCulture,
     getCultureList: getCultureList,
     setCultureList: setCultureList,
-    /** dev */ loadCultureForDictionary: loadCultureForDictionary,
 
     onCultureChange: onCultureChange
   };

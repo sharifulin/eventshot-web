@@ -42,6 +42,8 @@
   // definitions
   //
 
+  var dict = basis.l10n.dictionary(__filename);
+
   var templates = basis.template.define(namespace, {
     Example: resource('templates/field/Example.tmpl'),
     Description: resource('templates/field/Description.tmpl'),
@@ -82,22 +84,6 @@
     file: resource('templates/field/native-type-file.tmpl')
   });
 
-  basis.l10n.createDictionary(namespace, __dirname + 'l10n/field', {
-    "symbolsLeft": "Symbols left"
-  });
-
-  basis.l10n.createDictionary(namespace + '.validator', __dirname + 'l10n/field', {
-    "regExpWrongFormat": "The value has wrong format.",
-    "required": "The field is required and must have a value.",
-    "numberWrongFormat": "The value has wrong format of number.",
-    "currencyWrongFormat": "The value has wrong format of currency.",
-    "currencyMustBeGreaterZero": "The value must be greater than zero.",
-    "emailWrongFormat": "The value has a wrong format of e-mail.",
-    "urlWrongFormat": "The value has a wrong format of URL.",
-    "minLengthError": "The value must be longer than {0} symbols.",
-    "maxLengthError": "The value must be shorter than {0} symbols."
-  });
-
 
   //
   // main part
@@ -134,10 +120,19 @@
 
     name: '',
     title: '',
+    validators: null,
     validity: VALIDITY_INDETERMINATE,
     error: '',
     example: null,
     focused: false,
+    defaultValue: undefined,
+    value: undefined,
+
+    /**
+    * Identify field can have focus. Useful when search for next/previous node to focus.
+    * @type {boolean}
+    */
+    focusable: true,
 
     //
     // events
@@ -220,9 +215,9 @@
       description: 'satellite:'
     },
 
-    action: 'focus blur change keydown keypress keyup input'.qw().reduce(
+    action: 'focus blur change keydown keypress keyup input'.split(' ').reduce(
       function(res, item){
-        var eventName = 'emit_field' + item.capitalize();
+        var eventName = 'emit_field' + basis.string.capitalize(item);
         res[item] = function(event){
           this.setValue(this.readFieldValue_());
           this[eventName](event);
@@ -241,6 +236,7 @@
           return owner.example;
         },
         instanceOf: UINode.subclass({
+          className: namespace + '.Example',
           template: templates.Example,
           binding: {
             example: 'owner.example'
@@ -262,6 +258,7 @@
           return owner.description;
         },
         instanceOf: UINode.subclass({
+          className: namespace + '.Description',
           template: templates.Description,
           binding: {
             description: 'owner.description'
@@ -329,11 +326,11 @@
     },
 
     attachValidator: function(validator, validate){
-      if (this.validators.add(validator) && validate)
+      if (basis.array.add(this.validators, validator) && validate)
         this.validate();
     },
     detachValidator: function(validator, validate){
-      if (this.validators.remove(validator) && validate)
+      if (basis.array.remove(this.validators, validator) && validate)
         this.validate();
     },
     setValidity: function(validity, message){
@@ -576,8 +573,9 @@
           return owner.maxLength > 0;
         },
         instanceOf: UINode.subclass({
-          template: templates.Counter,
+          className: namespace + '.Counter',
 
+          template: templates.Counter,
           binding: {
             availChars: function(node){
               return node.owner.symbolsLeft;
@@ -827,17 +825,18 @@
 
     init: function(){
       ComplexField.prototype.init.call(this);
-      this.selection.set([this.childNodes[this.tmpl.field.selectedIndex]]);
+      this.selection.set([this.childNodes[this.tmpl && this.tmpl.field.selectedIndex]]);
     },
 
     getValue: function(){
-      var item = this.childNodes[this.tmpl.field.selectedIndex];
+      var item = this.childNodes[this.tmpl && this.tmpl.field.selectedIndex];
       return item && item.getValue();
     },
     setValue: function(value){
-      var item = this.childNodes.search(value, getFieldValue);
+      var item = basis.array.search(this.childNodes, value, getFieldValue);
       this.selection.set([item]);
-      this.tmpl.field.selectedIndex = item ? this.childNodes.indexOf(item) : -1;
+      if (this.tmpl)
+        this.tmpl.field.selectedIndex = item ? this.childNodes.indexOf(item) : -1;
     }
   });
 
@@ -932,6 +931,7 @@
           return owner.name;
         },
         instanceOf: Hidden.subclass({
+          className: namespace + '.ComboboxHidden',
           getValue: function(){
             return this.owner.getValue();
           },
@@ -976,7 +976,7 @@
               return;
             }
 
-            next = DOM.axis(cur || this.firstChild, DOM.AXIS_FOLLOWING_SIBLING).search(false, 'disabled');
+            next = basis.array.search(DOM.axis(cur || this.firstChild, DOM.AXIS_FOLLOWING_SIBLING), false, 'disabled');
           break;
 
           case event.KEY.UP: 
@@ -990,7 +990,7 @@
               return;
             }
 
-            next = DOM.axis(cur || this.lastChild, DOM.AXIS_PRECEDING_SIBLING).search(false, 'disabled');
+            next = basis.array.search(DOM.axis(cur || this.lastChild, DOM.AXIS_PRECEDING_SIBLING), false, 'disabled');
           break;
         }
 
@@ -1054,7 +1054,6 @@
 
       // create items popup
       this.popup = new this.popupClass(complete({ // FIXME: move to subclass, and connect components in templateSync
-        ignoreClickFor: [this.tmpl.field],
         content: this.childNodesElement,
         handler: {
           context: this,
@@ -1063,20 +1062,22 @@
       }, this.popup));
 
       if (this.property)
-        this.property.addLink(this, this.setValue);
+        this.property.link(this, this.setValue);
     },
-    templateSync: function(noRecreate){
-      if (this.childNodesElement)
-        DOM.remove(this.childNodesElement);
-
-      UINode.prototype.templateSync.call(this, noRecreate);
+    templateSync: function(){
+      UINode.prototype.templateSync.call(this);
 
       if (this.childNodesElement && this.popup)
         DOM.insert(this.popup.tmpl.content, this.childNodesElement);
+
+      this.popup.ignoreClickFor = [this.tmpl.field];
     },
     show: function(){
-      this.popup.show(this.tmpl.field); 
-      this.focus();
+      if (this.tmpl)
+      {
+        this.popup.show(this.tmpl.field);
+        this.focus();
+      }
     },
     hide: function(){
       this.popup.hide();
@@ -1093,7 +1094,7 @@
       if (this.getValue() != value)
       {
         // update value & selection
-        var item = this.childNodes.search(value, getFieldValue);
+        var item = basis.array.search(this.childNodes, value, getFieldValue);
         if (item && !item.isDisabled())
           this.selection.set([item]);
         else
@@ -1103,7 +1104,7 @@
     destroy: function(){
       if (this.property)
       {
-        this.property.removeLink(this);
+        this.property.unlink(this);
         this.property = null;
       }
 
@@ -1180,10 +1181,10 @@
       return false;
     },
 
-    emit_change: function(value, oldValue){
-      this.rx = this.regexpGetter(value);
+    emit_change: function(oldValue){
+      this.rx = this.regexpGetter(this.value);
 
-      Property.prototype.emit_change.call(this, value, oldValue);
+      Property.prototype.emit_change.call(this, oldValue);
     },
 
     extendConstructor_: true,
@@ -1195,7 +1196,7 @@
 
       if (typeof this.regexpGetter != 'function')
         this.regexpGetter = function(value){ 
-          return new RegExp('(' + startPoints + ')(' + value.forRegExp() + ')', 'i'); 
+          return new RegExp('(' + startPoints + ')(' + basis.string.forRegExp(value) + ')', 'i'); 
         };
 
       this.map = {};
@@ -1221,8 +1222,8 @@
   var Matcher = MatchProperty.subclass({
     className: namespace + '.Matcher',
 
-    emit_change: function(value, oldValue){
-      MatchProperty.prototype.emit_change.call(this, value, oldValue);
+    emit_change: function(oldValue){
+      MatchProperty.prototype.emit_change.call(this, oldValue);
 
       this.applyMatch();
     },
@@ -1246,10 +1247,10 @@
   var MatchFilter = MatchProperty.subclass({
     className: namespace + '.MatchFilter',
 
-    emit_change: function(value, oldValue){
-      MatchProperty.prototype.emit_change.call(this, value, oldValue);
+    emit_change: function(oldValue){
+      MatchProperty.prototype.emit_change.call(this, oldValue);
 
-      this.node.setMatchFunction(value ? this.matchFunction.bind(this) : null);
+      this.node.setMatchFunction(this.value ? this.matchFunction.bind(this) : null);
     }
   });
   
@@ -1307,47 +1308,47 @@
       return function(field){
         var value = field.getValue();
         if (value != '' && !value.match(regexp))
-          return new ValidatorError(field, l10nToken(namespace, 'validator', 'regExpWrongFormat'));
+          return new ValidatorError(field, dict.token('validator.regExpWrongFormat'));
       };
     },
     Required: function(field){
       var value = field.getValue();
       if (basis.fn.$isNull(value) || value == '')
-        return new ValidatorError(field, l10nToken(namespace, 'validator', 'required'));
+        return new ValidatorError(field, dict.token('validator.required'));
     },
     Number: function(field){
       var value = field.getValue();
       if (isNaN(value))
-        return new ValidatorError(field, l10nToken(namespace, 'validator', 'numberWrongFormat'));
+        return new ValidatorError(field, dict.token('validator.numberWrongFormat'));
     },
     Currency: function(field){
       var value = field.getValue();
       if (isNaN(value))
-        return new ValidatorError(field, l10nToken(namespace, 'validator', 'currencyWrongFormat'));
+        return new ValidatorError(field, dict.token('validator.currencyWrongFormat'));
       if (value <= 0)
-        return new ValidatorError(field, l10nToken(namespace, 'validator', 'currencyMustBeGreaterZero'));
+        return new ValidatorError(field, dict.token('validator.currencyMustBeGreaterZero'));
     },
     Email: function(field){
       var value = field.getValue().trim();
       if (value != '' && !value.match(REGEXP_EMAIL))
-        return new ValidatorError(field, l10nToken(namespace, 'validator', 'emailWrongFormat'));
+        return new ValidatorError(field, dict.token('validator.emailWrongFormat'));
     },
     Url: function(field){
       var value = field.getValue().trim();
       if (value != '' && !value.match(REGEXP_URL))
-        return new ValidatorError(field, l10nToken(namespace, 'validator', 'urlWrongFormat'));
+        return new ValidatorError(field, dict.token('validator.urlWrongFormat'));
     },
     MinLength: function(field){
       var value = field.getValue();
       var length = basis.fn.$isNotNull(value.length) ? value.length : String(value).length;
       if (length < field.minLength)
-        return new ValidatorError(field, String(l10nToken(namespace, 'validator', 'minLengthError')).format(field.minLength));
+        return new ValidatorError(field, basis.string.format(String(dict.token('validator.minLengthError')), field.minLength));
     },
     MaxLength: function(field){
       var value = field.getValue();
       var length = basis.fn.$isNotNull(value.length) ? value.length : String(value).length;
       if (length > field.maxLength)
-        return new ValidatorError(field, String(l10nToken(namespace, 'validator', 'maxLengthError')).format(field.maxLength));
+        return new ValidatorError(field, basis.string.format(String(dict.token('validator.maxLengthError')), field.maxLength));
     }
   };
 
@@ -1376,16 +1377,15 @@
     if (fieldType2Class.hasOwnProperty(fieldType))
       return new fieldType2Class[fieldType](config);
     else
-      throw 'Unknown field type `{0}`'.format(fieldType);
+      throw 'Unknown field type `' + fieldType + '`';
   }
 
-  module.setWrapper(function(config){
-    ;;;basis.dev.warn('using basis.ui.field as function is deprecated now, use basis.ui.field.create instead');
-    return createField(config);
-  });
+
+  //
+  // export names
+  //
 
   module.exports = {
-    Validator: Validator,  // deprecated
     validator: Validator,
     ValidatorError: ValidatorError,
 

@@ -17,6 +17,7 @@
   var location = global.location;
   var path = basis.path;
   var arrayFrom = basis.array.from;
+  var camelize = basis.string.camelize;
   var Class = basis.Class;
   var cleaner = basis.cleaner;
   var dom = basis.dom;
@@ -119,12 +120,12 @@
   * @return {StyleSheet}
   */
   function addStyleSheet(url, title){
-    var element = dom.createElement(!url ? 'style[type="text/css"]' : 'link[type="text/css"][rel="{alt}stylesheet"][href={url}]'.format({
+    var element = dom.createElement(!url ? 'style[type="text/css"]' : basis.string.format('link[type="text/css"][rel="{alt}stylesheet"][href="{url}"]', {
       alt: title ? 'alternate ' : '',
-      url: url.quote('"')
+      url: url.replace(/\"/g, '\\"')
     }));
 
-    dom.appendHead(element);
+    basis.doc.head.add(element);
 
     return StyleSheet_makeCompatible(element.sheet || element.styleSheet);
   }
@@ -151,11 +152,11 @@
   //
 
   var styleMapping = {};
-  var testElement = dom.createElement('DIV');
+  var testElement = dom.createElement('');
 
   function createStyleMapping(property, names, regSupport, getters){
     getters = getters || {};
-    names = names.qw();
+    names = names.split(' ');
 
     for (var i = 0, name; name = names[i]; i++)
     {
@@ -190,7 +191,7 @@
   function getStylePropertyMapping(key, value){
     var mapping = styleMapping[key];
 
-    if (key = mapping ? mapping.key : key.replace(/^-ms-/, 'ms-').camelize())
+    if (key = mapping ? mapping.key : camelize(key.replace(/^-ms-/, 'ms-')))
       return {
         key: key,
         value: mapping && mapping.getter ? mapping.getter(value) : value
@@ -294,21 +295,6 @@
   }
 
  /**
-  * @deprecated use basis.cssom.display instead.
-  */
-  function show(element){
-    ;;;basis.dev.warn('basis.cssom.show is deprecated, use basis.cssom.display instead');
-    return display(element, true);
-  }
- /**
-  * @deprecated use basis.cssom.display instead.
-  */
-  function hide(element){ 
-    ;;;basis.dev.warn('basis.cssom.hide is deprecated, use basis.cssom.display instead');
-    return display(element);
-  }
-
- /**
   * Changes node visibility.
   * @param {Element} node
   * @param {boolean=} visible
@@ -318,20 +304,6 @@
     return setStyleProperty(node, 'visibility', visible ? '' : 'hidden');
   }
 
- /**
-  * @deprecated use basis.cssom.visibility instead.
-  */
-  function visible(element){
-    ;;;basis.dev.warn('basis.cssom.visible is deprecated, use basis.cssom.visibility instead');
-    return visibility(element, true);
-  }
- /**
-  * @deprecated use basis.cssom.visibility instead.
-  */
-  function invisible(element){
-    ;;;basis.dev.warn('basis.cssom.invisible is deprecated, use basis.cssom.visibility instead');
-    return visibility(element);
-  }
 
   //
   // classes
@@ -581,7 +553,7 @@
 
     set: function(tokenList){
       this.clear();
-      tokenList.qw().forEach(this.add, this);
+      tokenList.trim().split(' ').forEach(this.add, this);
     },
     replace: function(searchFor, replaceFor, prefix){
       prefix = prefix || '';
@@ -606,7 +578,7 @@
       return !!this.toString().match(tokenRegExp(token));
     },
     item: function(index){
-      return this.toString().qw()[index];
+      return this.toString().trim().split(' ')[index];
     },
     add: function(token){ 
       var className = this.toString();
@@ -726,182 +698,10 @@
       : classList(element);
   };
 
-  //
-  // CSS resource
-  //
-
-  var dynamicResources = {};
-  var cleanupDom = true; // is require remove style node on CssResource destroy or not
-
-  // Test for appendChild bugs (old IE browsers has a problem with append textNode into <style>)
-  var STYLE_APPEND_BUGGY = (function(){
-    try {
-      return !dom.createElement('style', '');
-    } catch(e) {
-      return true;
-    }
-  })();
-
-
- /**
-  * Helper functions for path resolving
-  */
-  var baseEl = dom.createElement('base');
-  var documentHead = dom.head();
-
-  function setBase(baseURI){
-    // Opera and IE doesn't resolve pathes correctly, if base href is not an absolute path
-    // convert path to absolute value
-    baseEl.setAttribute('href', baseURI);
-
-    // if more than one <base> elements in document, only first has effect
-    // put our <base> resolver at the begining of <head>
-    dom.insert(documentHead, baseEl, 0);
-  }
-
-  function restoreBase(){
-    // Opera left document base as <base> element specified,
-    // even if this element is removed from document
-    // so we set current location for base
-    baseEl.setAttribute('href', location.href);
-
-    dom.remove(baseEl);    
-  }
-
-
- /**
-  * @class
-  */
-  var CssResource = Class(null, {
-    inUse: 0,
-
-    url: '',
-    baseURI: '',
-    cssText: '',
-
-    resource: null,
-    element: null,
-    textNode: null,
-
-    init: function(url){
-      this.url = path.resolve(url);
-      this.baseURI = path.dirname(url) + '/';
-
-      dynamicResources[url] = this;
-    },
-
-    updateCssText: function(cssText){
-      if (this.cssText != cssText)
-      {
-        this.cssText = cssText;
-        if (this.inUse)
-        {
-          setBase(this.baseURI);
-          this.syncCssText();
-          restoreBase();
-        }
-      }
-    },
-
-    syncCssText: function(){
-      if (this.textNode)
-      {
-        // W3C browsers
-        this.textNode.nodeValue = this.cssText;
-      }
-      else
-      {
-        // old IE
-        this.element.styleSheet.cssText = this.cssText;
-      }
-    },
-
-    startUse: function(){
-      if (!this.inUse)
-      {
-        if (!this.resource)
-        {
-          var resource = basis.resource(this.url);
-
-          this.resource = resource;
-          this.cssText = resource.get(true);
-        }
-
-        // set base before <style> element creating, because IE9+ set baseURI
-        // for <style> element on element creation
-        setBase(this.baseURI);
-
-        // create <style> element for first time
-        if (!this.element)
-        {
-          this.element = dom.createElement('style[src="' + path.relative(this.url) + '"]');
-          if (!STYLE_APPEND_BUGGY)
-            this.textNode = dom.insert(this.element, '');
-        }
-
-        // add element to document
-        dom.appendHead(this.element);
-        
-        // set css text after node inserted into document,
-        // IE8 and lower crash otherwise (this.element.styleSheet is not defined)
-        this.syncCssText();
-
-        restoreBase();
-      }
-
-      this.inUse += 1;
-    },
-
-    stopUse: function(){
-      if (this.inUse)
-      {
-        // decrease usage count
-        this.inUse -= 1;
-
-        // remove element if nobody use it
-        if (!this.inUse)
-          dom.remove(this.element);
-      }
-    },
-
-    destroy: function(){
-      if (this.element && cleanupDom)
-        dom.remove(this.element);
-
-      this.element = null;
-      this.textNode = null;
-      this.resource = null;
-      this.cssText = null;
-    }
-  });
-
-  basis.resource.extensions['.css'] = function(content, url){
-    var resource = dynamicResources[url];
-
-    if (!resource)
-      resource = new CssResource(url);
-    else
-      resource.updateCssText(content);
-
-    return resource;
-  };
-  basis.resource.extensions['.css'].updatable = true;
-
 
   //
-  // cleanup on page unload
+  // misc
   //
-
-  cleaner.add({
-    destroy: function(){
-      cleanupDom = false; // don't need remove unused style on global destroy
-
-      for (var url in dynamicResources)
-        dynamicResources[url].destroy();
-
-      dynamicResources = null;
-    }
-  });
 
   function createUnitFormatter(unit){
     return function(value){
@@ -938,12 +738,6 @@
     em: createUnitFormatter('em'),
     ex: createUnitFormatter('ex'),
     px: createUnitFormatter('px'),
-    percent: createUnitFormatter('%'),
-
-    // deprecated
-    show: show,
-    hide: hide,
-    visible: visible,
-    invisible: invisible
+    percent: createUnitFormatter('%')
   };
 

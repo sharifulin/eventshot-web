@@ -3,6 +3,11 @@ basis.require('basis.ui');
 basis.require('app.router');
 //;;;basis.require('basis.devpanel');
 
+//var t = basis.require('./1.js');
+//var t = basis.require('./1.tmpl', '.');
+//console.log(t);
+
+;;;app.uuid = '1825C0A465469AD086CFD93369BBF8CB';
 
 module.exports = basis.app.create({
   title: 'EventShot',

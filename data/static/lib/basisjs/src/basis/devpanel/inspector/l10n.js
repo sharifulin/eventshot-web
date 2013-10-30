@@ -1,6 +1,7 @@
 basis.require('basis.dom');
 basis.require('basis.dom.event');
 basis.require('basis.cssom');
+basis.require('basis.ui');
 
 var DOM = basis.dom;
 
@@ -9,11 +10,21 @@ var transport = resource('../API/transport.js').fetch();
 
 var inspectMode;
 var elements = [];
-var overlay;
 
-var overlay = DOM.createElement({
-  description: '[style="position: fixed; top: 0; bottom: 0; left: 0; right: 0; z-index: 10000; background: rgba(110,163,217,0.2)"]'
+var overlayNode = new basis.ui.Node({
+  template: resource('template/l10n_overlay.tmpl'),
+  action: {
+    mouseover: function(e){
+      basis.cssom.classList(overlayContent).add('hover');
+    },
+    mouseout: function(e){
+      basis.cssom.classList(overlayContent).remove('hover');
+    }
+  }
 });
+
+var overlay = overlayNode.tmpl.element;
+var overlayContent = overlayNode.tmpl.content;
 
 function pickHandler(){
   var sender = DOM.event.sender(event);
@@ -30,20 +41,11 @@ function loadToken(token){
   var dictionary = token.dictionary;
   var cultureList = basis.l10n.getCultureList();
 
-  var data = { 
+  var data = {
     cultureList: cultureList,
     selectedToken: token.name,
-    dictionaryName: dictionary.name, 
-    tokens: {}
+    dictionaryName: basis.path.relative('/', dictionary.resource.url)
   };
-
-  for (var key in dictionary.tokens)
-  {
-    var tkn = dictionary.tokens[key];
-    data.tokens[tkn.name] = {};
-    for (var j = 0, culture; culture = cultureList[j]; j++)
-      data.tokens[tkn.name][culture] = dictionary.getCultureValue(culture, tkn.name);
-  }
 
   transport.sendData('token', data);        
 }
@@ -65,10 +67,12 @@ function startInspect(){
   if (!inspectMode)
   {
     basis.cssom.classList(document.body).add('devpanel-inspectMode');
+    updateOnScroll();
     inspectMode = true;
     highlight();
 
-    basis.dom.event.addGlobalHandler('scroll', updateHighlight);
+    basis.dom.event.addGlobalHandler('scroll', updateOnScroll);
+    basis.dom.event.addHandler(window, 'resize', updateOnResize);
     DOM.event.captureEvent('mousedown', DOM.event.kill);
     DOM.event.captureEvent('mouseup', DOM.event.kill);
     DOM.event.captureEvent('contextmenu', endInspect);
@@ -80,7 +84,8 @@ function startInspect(){
       observer.observe(document.body, {
         subtree: true,
         attributes: true,
-        characterData: true
+        characterData: true,
+        childList: true
       });
   }
 }
@@ -92,7 +97,8 @@ function endInspect(){
 
     basis.cssom.classList(document.body).remove('devpanel-inspectMode');    
 
-    basis.dom.event.removeGlobalHandler('scroll', updateHighlight);
+    basis.dom.event.removeGlobalHandler('scroll', updateOnScroll);
+    basis.dom.event.removeHandler(window, 'resize', updateOnResize);
     DOM.event.releaseEvent('mousedown');
     DOM.event.releaseEvent('mouseup');
     DOM.event.releaseEvent('contextmenu');    
@@ -104,12 +110,33 @@ function endInspect(){
   }
 }
 
-function highlight(){
-  DOM.insert(document.body, overlay);
-  domTreeHighlight(document.body);
+function updateOnScroll(event){
+  overlayContent.style.top = -document.body.scrollTop + 'px';
+  overlayContent.style.left = -document.body.scrollLeft + 'px';
+
+  if (event && event.target !== document)
+    highlight(true);
 }
 
-function unhighlight(){
+var resizeTimer;
+function updateOnResize(){
+  clearTimeout(resizeTimer);
+  basis.cssom.classList(overlayContent).add('hide');
+  resizeTimer = setTimeout(function(){
+    basis.cssom.classList(overlayContent).remove('hide');
+    highlight(true);
+  }, 100);
+}
+
+function highlight(keepOverlay){
+  unhighlight(keepOverlay);
+  domTreeHighlight(document.body);
+
+  if (!keepOverlay)
+    DOM.insert(document.body, overlay);
+}
+
+function unhighlight(keepOverlay){
   var node;
 
   while (node = elements.pop())
@@ -118,61 +145,88 @@ function unhighlight(){
     DOM.remove(node);
   }
 
-  DOM.remove(overlay);
+  if (!keepOverlay)
+  {
+    basis.cssom.classList(overlayContent).remove('hover');
+    DOM.remove(overlay);
+  }
 }
 
-function updateHighlight(){
-  unhighlight();
-  highlight();
+function updateHighlight(records){
+  for (var i = 0; i < records.length; i++)
+    if (records[i].target != overlayContent
+        && records[i].target.parentNode != overlayContent
+        && records[i].target.id != 'devpanelSharedDom')
+    {
+      highlight(true);
+      break;
+    }
+}
+
+
+function addTokenToHighlight(token, ref, domNode){
+  if (token instanceof basis.l10n.Token && token.dictionary)
+  {
+    var rect;
+
+    if (ref && ref.nodeType == 1)
+    {
+      rect = ref.getBoundingClientRect();
+    }
+    else
+    {
+      var range = document.createRange();
+      range.selectNodeContents(domNode);
+      rect = range.getBoundingClientRect();
+    }
+
+    if (rect)
+    {
+      var color = getColorForDictionary(token.dictionary.resource.url);
+      var bgColor = 'rgba(' + color.join(',') + ', .3)';
+      var borderColor = 'rgba(' + color.join(',') + ', .6)';
+      var element = overlayContent.appendChild(basis.dom.createElement({
+        description: '.devpanel-l10n-token',
+        css: {
+          backgroundColor: bgColor,
+          outline: '1px solid ' + borderColor,
+          top: document.body.scrollTop + rect.top + 'px',
+          left: document.body.scrollLeft + rect.left + 'px',
+          width: rect.width + 'px', 
+          height: rect.height + 'px'
+        }
+      }));
+
+      element.token = token;
+      elements.push(element);
+    }
+  }
 }
 
 function domTreeHighlight(root){
-  var range = document.createRange();
-
-  for (var i = 0, child; child = root.childNodes[i]; i++)
+  for (var i = 0, child, l10nRef; child = root.childNodes[i]; i++)
   {
-    if (child.nodeType == basis.dom.ELEMENT_NODE) 
+    if (child.basisTemplateId)
     {
-      if (child.basisObjectId)
+      var debugInfo = basis.template.getDebugInfoById(child.basisTemplateId);
+      if (debugInfo)
       {
-        var node = basis.template.resolveObjectById(child.basisObjectId);
-        if (node)
+        for (var j = 0, binding; binding = debugInfo[j]; j++)
         {
-          var bindings = (node.tmpl.set.debug && node.tmpl.set.debug()) || [];
-          for (var j = 0, binding; binding = bindings[j]; j++)
-          {
-            if (binding.attachment instanceof basis.l10n.Token && binding.dom.nodeType == basis.dom.TEXT_NODE)
-            {
-              //nodes.push(binding.dom);
-              range.selectNodeContents(binding.dom);
-              var rect = range.getBoundingClientRect();
-              if (rect)
-              {
-                var color = getColorForDictionary(binding.attachment.dictionary.name);
-                var bgColor = 'rgba(' + color.join(',') + ', .3)';
-                var borderColor = 'rgba(' + color.join(',') + ', .6)';
-                var element = overlay.appendChild(basis.dom.createElement({
-                  css: {
-                    backgroundColor: bgColor,
-                    outline: '1px solid ' + borderColor,
-                    zIndex: 65000,
-                    position: 'fixed',
-                    cursor: 'pointer',
-                    top: rect.top + 'px',
-                    left: rect.left + 'px',
-                    width: rect.width + 'px', 
-                    height: rect.height + 'px'
-                  }
-                }));
+          var token = binding.attachment;
 
-                element.token = binding.attachment;
+          if (token instanceof basis.l10n.ComputeToken)
+            token = token.token;
 
-                elements.push(element);
-              }
-            }
-          }
+          addTokenToHighlight(token, binding.val, binding.dom);
         }
       }
+    }
+
+    if (child.nodeType == basis.dom.ELEMENT_NODE) 
+    {
+      if (l10nRef = child.getAttribute('data-basisjs-l10n'))
+        addTokenToHighlight(basis.l10n.token(l10nRef), child, child);
 
       domTreeHighlight(child);
     }  

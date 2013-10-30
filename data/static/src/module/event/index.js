@@ -103,7 +103,7 @@ var view = new basis.ui.Node({
               params: {
                 title: this.data.title
               },
-              url: '/api/event/' + this.data.id /** @cut */ + '?uuid=30489C58E885A0E8B5C2A2A199862EFA'
+              url: '/api/event/' + this.data.id /** @cut */ + '?uuid=' + app.uuid
             }, function(data){
               app.type.Event(id).set('title', data.event.title);
             });
@@ -161,7 +161,7 @@ var view = new basis.ui.Node({
               params: {
                 description: this.data.description
               },
-              url: '/api/event/' + this.data.id /** @cut */ + '?uuid=30489C58E885A0E8B5C2A2A199862EFA'
+              url: '/api/event/' + this.data.id /** @cut */ + '?uuid=' + app.uuid
             }, function(data){
               app.type.Event(id).set('description', data.event.description);
             });

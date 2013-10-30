@@ -1,5 +1,4 @@
 
-  basis.require('basis.timer');
   basis.require('basis.dom');
   basis.require('basis.dom.event');
   basis.require('basis.cssom');
@@ -50,12 +49,16 @@
     return '[style="padding:0!important;margin:0!important;border:0!important;width:auto!important;height:0!important;font-size:0!important;' + (extraStyle || '') + '"]';
   }
 
-  function buildCellsSection(owner, property){
-    return createElement('tbody' + resetStyle(),
-      createElement('tr' + resetStyle(),
-        owner.columnWidthSync_.map(basis.getter(property))
-      )
-    );
+  function cellSectionBuilder(property){
+    var ref = 'section_' + property + '_';
+
+    return function(owner){
+      return owner[ref] || (owner[ref] = createElement('tbody' + resetStyle(),
+        createElement('tr' + resetStyle(),
+          owner.columnWidthSync_.map(basis.getter(property))
+        )
+      ));
+    }
   }
 
   function replaceTemplateNode(owner, refName, newNode){
@@ -72,7 +75,7 @@
         resetStyle(
           'width:100%!important;position:absolute!important;visibility:hidden!important;' +
           // hack for IE via behavior - load event emulation
-          // FIXME: find to better way, but anyway don't access to basis via global scope (it may be removed ob build)
+          // FIXME: find to better way, but anyway don't access to basis via global scope (it may be removed on build)
           'behavior:expression(basis.dom.event.fireEvent(window,\\"load\\",{type:\\"load\\",target:this}),(runtimeStyle.behavior=\\"none\\"))'
         )
       )
@@ -108,7 +111,16 @@
     */
     template: templates.ScrollTable,
     binding: {
-      fitToContainer: 'fitToContainer'
+      fitToContainer: 'fitToContainer',
+
+      // measure row
+      measureRow: cellSectionBuilder('measure'),
+      
+      // header expander row
+      headerExpandRow: cellSectionBuilder('header'),
+      
+      // footer expander row
+      footerExpandRow: cellSectionBuilder('footer')
     },
     action: {
       scroll: function(){
@@ -126,6 +138,7 @@
     },
 
     headerClass: {
+      className: namespace + '.Header',
       listen: {
         childNode: {
           '*': function(){
@@ -160,21 +173,19 @@
         };
       });
 
-      // insert measure row
-      replaceTemplateNode(this, 'measureRow', buildCellsSection(this, 'measure'));
-
-      // insert header expander row
-      replaceTemplateNode(this, 'headerExpandRow', buildCellsSection(this, 'header'));
-
-      // insert footer expander row
-      replaceTemplateNode(this, 'footerExpandRow', buildCellsSection(this, 'footer'));
-
-      // add block resize trigger
-      layout.addBlockResizeHandler(this.tmpl.boundElement, this.requestRelayout);
-
       // FIXME: hack for ie, trigger relayout on create
       if (IE8)
         setTimeout(this.requestRelayout, 1);
+    },
+
+    templateSync: function(){
+      Table.prototype.templateSync.call(this);
+
+      // add block resize trigger
+      if ('boundElement' in this.tmpl)
+        layout.addBlockResizeHandler(this.tmpl.boundElement, this.requestRelayout);
+
+      this.requestRelayout();
     },
 
    /**
@@ -182,7 +193,7 @@
     */
     requestRelayout: function(){
       if (!this.timer_)
-        this.timer_ = basis.timer.nextTick(this.relayout, 0);
+        this.timer_ = basis.setImmediate(this.relayout);
     },
 
    /**
@@ -245,16 +256,19 @@
 
       // reset timer
       // it should be at the end of relayout to prevent relayout call while relayout
-      this.timer_ = clearTimeout(this.timer_);
+      this.timer_ = basis.clearImmediate(this.timer_);
     },
 
    /**
     * @inheritDoc
     */
     destroy: function(){
-      clearTimeout(this.timer_);
+      basis.clearImmediate(this.timer_);
       this.timer_ = true; // prevent relayout call
 
+      this.section_measure_ = null;
+      this.section_header_ = null;
+      this.section_footer_ = null;
       this.columnWidthSync_ = null;
       this.shadowHeaderHtml_ = null;
       this.shadowFooterHtml_ = null;

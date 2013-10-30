@@ -51,7 +51,7 @@
     if (this.autoSelectChild && this.selection && !this.selection.itemCount)
     {
       // select first non-disabled child
-      var node = this.childNodes.search(false, 'disabled');
+      var node = basis.array.search(this.childNodes, false, 'disabled');
       if (node)
         node.select();
     }
@@ -92,8 +92,8 @@
         return this.childNodes.indexOf(item);
 
       // search by name
-      if (this.childNodes.search(item, 'name'))
-        return Array.lastSearchIndex;
+      if (basis.array.search(this.childNodes, item, 'name'))
+        return this.childNodes.lastSearchIndex;
 
       return -1;
     }
@@ -181,25 +181,7 @@
 
     template: templates.TabSheet,
 
-    childClass: UINode,
-
-    templateSync: function(noRecreate){
-      var pageElement = this.tmpl.pageElement;
-      Tab.prototype.templateSync.call(this, noRecreate);
-      if (pageElement && this.tmpl.pageElement !== pageElement)
-      {
-        if (!this.tmpl.pageElement)
-          DOM.remove(pageElement);
-        else
-          DOM.replace(pageElement, this.tmpl.pageElement);
-      }
-    },
-
-    destroy: function(){
-      DOM.remove(this.tmpl.pageElement);
-      
-      Tab.prototype.destroy.call(this);
-    }
+    childClass: UINode
   });
 
 
@@ -213,30 +195,19 @@
 
     childClass: TabSheet,
 
-    insertBefore: function(newChild, refChild){
-      if (newChild = TabControl.prototype.insertBefore.call(this, newChild, refChild))
-      {
-        if (this.tmpl.pagesElement)
-          this.tmpl.pagesElement.insertBefore(newChild.tmpl.pageElement, newChild.nextSibling ? newChild.nextSibling.tmpl.pageElement : null);
-      }
-
-      return newChild;
-    },
-    removeChild: function(oldChild){
-    	if (oldChild = TabControl.prototype.removeChild.call(this, oldChild))
-      {
-        if (this.tmpl.pagesElement)
-          oldChild.element.appendChild(oldChild.tmpl.pageElement);
-      }
-      return oldChild;
-    },
-    clear: function(keepAlive){
-      // put pageElement back to TabSheet root element
-      this.childNodes.forEach(function(tabSheet){
-        tabSheet.element.appendChild(tabSheet.tmpl.pageElement);
-      });
-
-      TabControl.prototype.clear.call(this, keepAlive);
+    satelliteConfig: {
+      shadowPages: basis.ui.ShadowNodeList.subclass({
+        className: namespace + '.ShadowPages',
+        getChildNodesElement: function(host){
+          return host.tmpl.pagesElement;
+        },
+        childClass: {
+          className: namespace + '.ShadowPage',
+          getElement: function(node){
+            return node.tmpl.pageElement;
+          }
+        }
+      })
     }
   });
 

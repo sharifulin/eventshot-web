@@ -75,21 +75,6 @@
         }
     },
 
-   /**
-    * @deprecated
-    */
-    getFieldByName: function(name){
-      ;;;basis.dev.warn('basis.ui.form.FormContent#getFieldByName is deprecated, use getChildByName method istead');
-      return this.getChildByName(name);
-    },
-   /**
-    * @deprecated
-    */
-    getFieldById: function(id){
-      ;;;basis.dev.warn('basis.ui.form.FormContent#getFieldById is deprecated, use getChild method istead');
-      return this.getChild(id, 'id');
-    },
-
     loadData: function(data, noValidate){
       for (var i = 0, field; field = this.childNodes[i]; i++)
       {
@@ -177,7 +162,7 @@
       if (this.onSubmit)
         this.onSubmit(this.serialize());
 
-      if (this.tmpl.form)
+      if (this.tmpl && this.tmpl.form)
         this.tmpl.form.submit();
     }
   });

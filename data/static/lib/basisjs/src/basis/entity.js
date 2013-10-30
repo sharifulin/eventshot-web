@@ -292,6 +292,7 @@
   var EntitySet = Class(Dataset, {
     className: namespace + '.EntitySet',
 
+    name: null,
     wrapper: $self,
 
     init: ENTITYSET_INIT_METHOD(Dataset, 'EntitySet'),
@@ -333,11 +334,11 @@
   var EntityCollection = Class(Subset, {
     className: namespace + '.EntityCollection',
 
+    name: null,
+
     init: ENTITYSET_INIT_METHOD(Subset, 'EntityCollection'),
     sync: ENTITYSET_SYNC_METHOD(Subset)
   });
-
-  EntityCollection.sourceHandler = Subset.sourceHandler;
 
   //
   // Entity grouping
@@ -349,6 +350,8 @@
   var EntityGrouping = Class(Split, {
     className: namespace + '.EntityGrouping',
 
+    name: null,
+
     subsetClass: ReadOnlyEntitySet,
 
     init: ENTITYSET_INIT_METHOD(Split, 'EntityGrouping'),
@@ -356,8 +359,10 @@
 
     getSubset: function(object, autocreate){
       var group = Split.prototype.getSubset.call(this, object, autocreate);
-      if (group)
-        group.wrapper = this.wrapper;
+
+      if (group && group.dataset)
+        group.dataset.wrapper = this.wrapper;
+
       return group;
     }
   });
@@ -630,12 +635,17 @@
       if (Array.isArray(config.type))
       {
         var values = config.type.slice(); // make copy of array to make it stable
+
         config.type = function(value, oldValue){
           var exists = values.indexOf(value) != -1;
-          ;;;if (!exists) basis.dev.warn('Set value that not in list for ' + entityType.name + '#field.' + key + ', new value ignored.');
+
+          /** @cut */ if (!exists)
+          /** @cut */   basis.dev.warn('Set value that not in list for ' + entityType.name + '#field.' + key + ', new value ignored.');
+
           return exists ? value : oldValue;
         };
-        config.defValue = config.type(config.defValue, values[0]);
+
+        config.defValue = values.indexOf(config.defValue) != -1 ? config.defValue : values[0];
       }
 
       if (config.type === Array)
@@ -651,7 +661,7 @@
 
     var wrapper = config.type || $self;
 
-    if ([NumericId, NumberId, IntId, StringId].has(wrapper))
+    if ([NumericId, NumberId, IntId, StringId].indexOf(wrapper) != -1)
       config.id = true;
 
     if (config.id)
@@ -736,7 +746,7 @@
 
     if (wrapper.args)
       for (var i = 0; i < entityType.calcs.length; i++)
-        if (wrapper.args.has(entityType.calcs[i].key))
+        if (wrapper.args.indexOf(entityType.calcs[i].key) != -1)
           after = i + 1;
 
     if (key)
@@ -744,7 +754,7 @@
       // natural calc field
       calcConfig.key = key;
       for (var i = 0; i < entityType.calcs.length; i++)
-        if (entityType.calcs[i].args.has(key))
+        if (entityType.calcs[i].args.indexOf(key) != -1)
         {
           before = i;
           break;
@@ -752,7 +762,7 @@
 
       if (after > before)
       {
-        ;;;basis.dev.warn('Can\'t add calculate field `{0}`, because recursion'.format(key));
+        ;;;basis.dev.warn('Can\'t add calculate field `' + key + '`, because recursion');
         return;
       }
 
@@ -840,8 +850,6 @@
         }, this);
       }
 
-      ;;;if ('isSingleton' in config) basis.dev.warn('Property `isSingleton` in config is obsolete. Use `singleton` property instead.');
-
       // create entity class
       this.entityClass = createEntityClass(this, this.all, this.fields, this.defaults, this.slots);
       this.entityClass.extend({
@@ -865,19 +873,6 @@
 
       // reg entity type
       entityTypes.push(this);
-
-      /** @cut */ this.addField = function(key, config){
-      /** @cut */   ;;;basis.dev.warn('basis.entity.EntityTypeConstructor#addField method is deprecated, define all fields on type create and use type by name resolving');
-      /** @cut */   addField(this, key, config);
-      /** @cut */ };
-      /** @cut */ this.addAlias = function(alias, key){
-      /** @cut */   ;;;basis.dev.warn('basis.entity.EntityTypeConstructor#addAlias method is deprecated, define all field aliases on type create');
-      /** @cut */   addFieldAlias(this, alias, key);
-      /** @cut */ };
-      /** @cut */ this.addCalcField = function(key, wrapper){
-      /** @cut */   ;;;basis.dev.warn('basis.entity.EntityTypeConstructor#addCalcField method is deprecated, define all fields on type create');
-      /** @cut */   addCalcField(this, key, wrapper);
-      /** @cut */ };
     },
     reader: function(data){
       var result = {};
@@ -965,8 +960,10 @@
   var BaseEntity = Class(DataObject, {
     className: namespace + '.BaseEntity',
 
-    canSetDelegate: false,
     isTarget: true,
+    setDelegate: function(){
+      // entity can't has a delegate
+    },
 
     modified: null,
 

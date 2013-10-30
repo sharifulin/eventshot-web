@@ -125,7 +125,7 @@
         }
       }
 
-      marks = marks.filter(basis.fn.$isNotNull).sortAsObject('pos');
+      marks = basis.array.sortAsObject(marks.filter(basis.fn.$isNotNull), 'pos');
 
       var pos = 0;
       for (var i = 0, mark; mark = marks[i]; i++)
@@ -176,6 +176,8 @@
       return Math.round(Number(value));
     },
 
+    dde: null,
+
     marks: 'auto',
 
     min: 0,
@@ -185,7 +187,6 @@
 
     stepCount: NaN,
     stepValue: NaN,
-
 
     template: templates.Slider,
     binding: {
@@ -304,8 +305,8 @@
       });
     },
 
-    templateSync: function(noRecreate){
-      UINode.prototype.templateSync.call(this, noRecreate);
+    templateSync: function(){
+      UINode.prototype.templateSync.call(this);
 
       if (this.tmpl.scrollThumb)
         this.dde.setElement(this.tmpl.scrollThumb);
@@ -367,14 +368,14 @@
     * @return {number} Closest to pos value.
     */
     closest: function(pos){
-      return this.normalize(this.min + (this.max - this.min) * pos.fit(0, 1) + (this.step / 2));
+      return this.normalize(this.min + (this.max - this.min) * basis.number.fit(pos, 0, 1) + (this.step / 2));
     },
 
    /**
     * @return {number}
     */
     value2pos: function(value){     
-      return (value.fit(this.min, this.max) - this.min) / (this.max - this.min);
+      return (basis.number.fit(value, this.min, this.max) - this.min) / (this.max - this.min);
     },
 
    /**
@@ -413,7 +414,7 @@
     * @param {number} stepValue
     */
     setStepValue: function(stepValue){
-      stepValue = Math.round(stepValue).fit(0, this.stepCount);
+      stepValue = basis.number.fit(Math.round(stepValue), 0, this.stepCount);
 
       if (this.stepValue != stepValue)
       {

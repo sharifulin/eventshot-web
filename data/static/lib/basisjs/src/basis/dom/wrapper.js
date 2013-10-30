@@ -26,7 +26,8 @@
 
   var Class = basis.Class;
   var complete = basis.object.complete;
-  var arrayFrom = basis.array.from;
+  var arrayFrom = basis.array;
+  var arrayRemove = basis.array.remove;
   var $undef = basis.fn.$undef;
   var getter = basis.getter;
   var nullGetter = basis.fn.nullGetter;
@@ -41,6 +42,7 @@
   var DataObject = basis.data.Object;
   var AbstractDataset = basis.data.AbstractDataset;
   var Dataset = basis.data.Dataset;
+  var DatasetWrapper = basis.data.DatasetWrapper;
 
 
   //
@@ -62,6 +64,21 @@
   };
 
   var childNodesDatasetMap = {};
+
+  function warnOnDataSourceItemNodeDestoy(){
+    /** @cut */ basis.dev.warn(namespace + ': node can\'t be destroed as representing dataSource item, destroy delegate item or remove it from dataSource first');
+  }
+
+  function lockDataSourceItemNode(node){
+    node.setDelegate = basis.fn.$undef;
+    node.destroy = warnOnDataSourceItemNodeDestoy;
+  }
+
+  function unlockDataSourceItemNode(node){
+    var proto = node.constructor.prototype;
+    node.setDelegate = proto.setDelegate;
+    node.destroy = proto.destroy;
+  }
 
 
   //
@@ -94,6 +111,34 @@
     );
   }
 
+  function binarySearchPos(array, value, getter_, desc){
+    if (!array.length)  // empty array check
+      return 0;
+
+    desc = !!desc;
+
+    var pos, compareValue;
+    var l = 0;
+    var r = array.length - 1;
+
+    do
+    {
+      pos = (l + r) >> 1;
+      compareValue = getter_(array[pos]);
+      if (desc ? value > compareValue : value < compareValue)
+        r = pos - 1;
+      else
+        if (desc ? value < compareValue : value > compareValue)
+          l = pos + 1;
+        else
+          return value == compareValue ? pos : 0;  // founded element
+                                                    // -1 returns when it seems as founded element,
+                                                    // but not equal (array item or value looked for have wrong data type for compare)
+    }
+    while (l <= r);
+
+    return pos + ((compareValue < value) ^ desc);
+  }
 
   //
   // selection
@@ -214,13 +259,17 @@
         if (config && typeof config == 'object')
         {
           var hookRequired = false;
-          var contextConfig = {
-            instanceOf: config.instanceOf
-          };
+          var instanceClass = config.instanceOf;
+          var contextConfig = {};
           var context = {
             key: key,
             config: contextConfig
           };
+
+          if (!Class.isClass(instanceClass) || !instanceClass.isSubclassOf(AbstractData))
+            instanceClass = AbstractNode;
+
+          contextConfig.instanceOf = instanceClass;
 
           if (typeof config.config)
             contextConfig.config = config.config;
@@ -381,12 +430,6 @@
     autoDelegate: DELEGATE.NONE,
 
    /**
-    * @type {string}
-    * @readonly
-    */
-    nodeType: 'DOMWrapperNode',
-
-   /**
     * Name of node. Using by parent to fetch child by name.
     * @type {string}
     */
@@ -453,6 +496,11 @@
     * @param {basis.data.AbstractDataset} oldDataSource
     */
     emit_dataSourceChanged: createEvent('dataSourceChanged', 'oldDataSource'),
+
+   /**
+    * @type {basis.data.DatasetWrapper}
+    */
+    dataSourceWrapper_: null,
 
    /**
     * Map dataSource members to child nodes.
@@ -568,10 +616,10 @@
     satellite: null,
 
    /**
-    * @param {string} key
-    * @param {basis.data.Object} oldSattelite Old satellite for key
+    * @param {string} name Name of satellite
+    * @param {basis.data.AbstractData} oldSattelite Old satellite for key
     */
-    emit_satelliteChanged: createEvent('satelliteChanged', 'key', 'oldSatellite'),
+    emit_satelliteChanged: createEvent('satelliteChanged', 'name', 'oldSatellite'),
 
    /**
     * Node owner. Generaly using by satellites and GroupingNode.
@@ -644,14 +692,14 @@
       this.satellite = {};
       
       if (satellites)
-        for (var key in satellites)
-          this.setSatellite(key, satellites[key]);
+        for (var name in satellites)
+          this.setSatellite(name, satellites[name]);
 
       if (this.satelliteConfig !== NULL_SATELLITE_CONFIG)
       {
-        for (var key in this.satelliteConfig)
+        for (var name in this.satelliteConfig)
         {
-          var satelliteConfig = this.satelliteConfig[key];
+          var satelliteConfig = this.satelliteConfig[name];
           if (satelliteConfig && typeof satelliteConfig == 'object')
           {
             var context = {
@@ -782,13 +830,23 @@
       if (oldOwner !== owner)
       {
         var listenHandler = this.listen.owner;
+
         if (listenHandler)
         {
           if (oldOwner)
             oldOwner.removeHandler(listenHandler, this);
+
           if (owner)
             owner.addHandler(listenHandler, this);
         }
+
+        if (oldOwner)
+          for (var name in oldOwner.satellite)
+            if (oldOwner.satellite[name] === this)
+            {
+              oldOwner.setSatellite(name, null);
+              break;
+            }
 
         this.owner = owner;
         this.emit_ownerChanged(oldOwner);
@@ -815,21 +873,22 @@
 
         if (oldSatellite)
         {
+          delete this.satellite[name];
+
           if (oldSatellite instanceof AbstractNode)
             oldSatellite.setOwner(null);
+
           if (satelliteListen)
             oldSatellite.removeHandler(satelliteListen, this);
         }
 
         if (satellite)
-          this.satellite[name] = satellite;
-        else
-          delete this.satellite[name];
-
-        if (satellite)
         {
+          this.satellite[name] = satellite;
+
           if (satellite instanceof AbstractNode)
             satellite.setOwner(this);
+
           if (satelliteListen)
             satellite.addHandler(satelliteListen, this);
         }
@@ -978,7 +1037,7 @@
     */
     remove: function(oldNode){
       var nodes = this.nodes;
-      if (nodes.remove(oldNode))
+      if (arrayRemove(nodes, oldNode))
       {
         this.first = nodes[0] || null;
         this.last = nodes[nodes.length - 1] || null;
@@ -1050,8 +1109,10 @@
         {
           // copy childNodes to deleted
           deleted = arrayFrom(this.childNodes);
+
+          // restore posibility to change delegate and destroy
           for (var i = 0, child; child = deleted[i]; i++)
-            child.canSetDelegate = true;
+            unlockDataSourceItemNode(child);
 
           // optimization: if all old nodes deleted -> clear childNodes
           var tmp = this.dataSource;
@@ -1067,8 +1128,10 @@
             var delegateId = item.basisObjectId;
             var oldChild = this.dataSourceMap_[delegateId];
 
+            // restore posibility to change delegate and destroy
+            unlockDataSourceItemNode(oldChild);
+
             delete this.dataSourceMap_[delegateId];
-            oldChild.canSetDelegate = true; // allow delegate drop
             this.removeChild(oldChild);
 
             deleted.push(oldChild);
@@ -1083,15 +1146,13 @@
         for (var i = 0, item; item = delta.inserted[i]; i++)
         {
           var newChild = createChildByFactory(this, {
-            cascadeDestroy: false,     // NOTE: it's important set cascadeDestroy to false, otherwise
-                                       // there will be two attempts to destroy node - 1st on delegate
-                                       // destroy, 2nd on object removal from dataSource
-            //canSetDelegate: false,   // NOTE: we can't set canSetDelegate in config, because it
-                                       // prevents delegate assignment
             delegate: item
           });
 
-          newChild.canSetDelegate = false; // prevent delegate override
+          // prevent delegate override and destroy
+          // NOTE: we can't define setDelegate in config, because it
+          // prevents delegate assignment
+          lockDataSourceItemNode(newChild);
 
           // insert
           this.dataSourceMap_[item.basisObjectId] = newChild;
@@ -1123,6 +1184,16 @@
         this.setDataSource();
     }
   };
+
+  var MIXIN_DATASOURCE_WRAPPER_HANDLER = {
+    datasetChanged: function(wrapper){
+      this.setDataSource(wrapper);
+    },
+    destroy: function(){
+      this.setDataSource();
+    }
+  };
+
 
   function fastChildNodesOrder(node, order){
     var lastIndex = order.length - 1;
@@ -1213,26 +1284,20 @@
     },
 
    /**
-    *
+    * @param {*} value
+    * @param {function|string} getter
+    * @return {basis.dom.wrapper.AbstractNode|undefined}
     */
     getChild: function(value, getter){
-      return this.childNodes.search(value, getter);
+      return basis.array.search(this.childNodes, value, getter);
     },
 
    /**
-    *
+    * @param {string} name
+    * @return {basis.dom.wrapper.AbstractNode|undefined} Return first child node with specified name.
     */
     getChildByName: function(name){
       return this.getChild(name, 'name');
-    },
-
-   /**
-    *
-    */
-    getChildren: function(value, getter){
-      return this.childNodes.filter(function(child){
-        return getter(child) == value;
-      });
     },
 
    /**
@@ -1349,7 +1414,7 @@
           else
           {
             // when sorting use binary search
-            pos = groupNodes.binarySearchPos(newChildValue, sortingSearch, sortingDesc);
+            pos = binarySearchPos(groupNodes, newChildValue, sortingSearch, sortingDesc);
             newChild.sortingValue = newChildValue;
           }
         }
@@ -1411,7 +1476,7 @@
             return newChild;
 
           // search for refChild
-          pos = childNodes.binarySearchPos(newChildValue, sortingSearch, sortingDesc);
+          pos = binarySearchPos(childNodes, newChildValue, sortingSearch, sortingDesc);
           refChild = childNodes[pos];
           newChild.sortingValue = newChildValue; // change sortingValue AFTER search
 
@@ -1467,7 +1532,7 @@
           this.firstChild = nextSibling;
 
         if (pos == -1)
-          childNodes.remove(newChild);
+          arrayRemove(childNodes, newChild);
         else
         {
           var oldPos = childNodes.indexOf(newChild);
@@ -1739,7 +1804,32 @@
     * @inheritDoc
     */
     setDataSource: function(dataSource){
-      if (!dataSource || !this.childClass || dataSource instanceof AbstractDataset == false)
+      var dataSourceWrapper = null;
+      var oldDataSourceWrapper = this.dataSourceWrapper_;
+
+      if (!dataSource || !this.childClass)
+        dataSource = null;
+
+      // dataset wrapper
+      if (dataSource instanceof DatasetWrapper)
+      {
+        dataSourceWrapper = dataSource;
+        dataSource = dataSourceWrapper.dataset;
+      }
+
+      if (oldDataSourceWrapper !== dataSourceWrapper)
+      {
+        if (oldDataSourceWrapper)
+          oldDataSourceWrapper.removeHandler(MIXIN_DATASOURCE_WRAPPER_HANDLER, this);
+
+        if (dataSourceWrapper)
+          dataSourceWrapper.addHandler(MIXIN_DATASOURCE_WRAPPER_HANDLER, this);
+
+        this.dataSourceWrapper_ = dataSourceWrapper;
+      }
+
+      // dataset
+      if (dataSource instanceof AbstractDataset == false)
         dataSource = null;
 
       if (this.dataSource !== dataSource)
@@ -1763,7 +1853,7 @@
           // return posibility to change delegate
           if (oldDataSource)
             for (var i = 0, child; child = this.childNodes[i]; i++)
-              child.canSetDelegate = true;
+              unlockDataSourceItemNode(child);
 
           this.clear();
         }
@@ -1992,11 +2082,11 @@
     * @param {string} key
     * @param {basis.data.Object} oldSattelite Old satellite for key
     */
-    emit_satelliteChanged: function(key, oldSatellite){
-      AbstractNode.prototype.emit_satelliteChanged.call(this, key, oldSatellite);
+    emit_satelliteChanged: function(name, oldSatellite){
+      AbstractNode.prototype.emit_satelliteChanged.call(this, name, oldSatellite);
 
-      if (this.satellite[key] instanceof Node)
-        updateNodeDisableContext(this.satellite[key], this.disabled || this.contextDisabled);
+      if (this.satellite[name] instanceof Node)
+        updateNodeDisableContext(this.satellite[name], this.disabled || this.contextDisabled);
     },    
 
    /**
@@ -2146,14 +2236,6 @@
 
         return true;
       }
-    },
-    
-   /**
-    * Returns true if node has it's own selection.
-    * @return {boolean}
-    */
-    hasOwnSelection: function(){
-      return !!this.selection;
     },
 
    /**
@@ -2382,6 +2464,7 @@
     // properties
 
     map_: null,
+    nullGroup: null,
 
     autoDestroyWithNoOwner: true,
     autoDestroyEmptyGroups: true,
@@ -2641,6 +2724,8 @@
   };
 
  /**
+  * You should avoid to create instances of this class using `new` operator,
+  * use basis.dom.wrapper.AbstractNode#getChildNodesDataset method instead.
   * @class
   */
   var ChildNodesDataset = Class(AbstractDataset, {
@@ -2792,9 +2877,7 @@
     PartitionNode: PartitionNode,
 
     // datasets
+    ChildNodesDataset: ChildNodesDataset,
     Selection: Selection,
-    nullSelection: new AbstractDataset,
-
-    // deprecated, use node.getChildNodesDataset()
-    ChildNodesDataset: ChildNodesDataset
+    nullSelection: new AbstractDataset
   };

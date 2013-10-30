@@ -3,7 +3,7 @@ basis.require('basis.net.service');
 var defaultService = new basis.net.service.Service({
   transportClass: basis.net.Transport.subclass({
     request: function(){
-      ;;;this.setParam('uuid', '30489C58E885A0E8B5C2A2A199862EFA');
+      ;;;this.setParam('uuid', app.uuid);
       basis.net.Transport.prototype.request.apply(this, arguments);
     }
   })
@@ -11,11 +11,12 @@ var defaultService = new basis.net.service.Service({
 
 (app.updateProviderList = function(){
   basis.net.request({
-    url: '/api/user'/** @cut*/ + '?uuid=30489C58E885A0E8B5C2A2A199862EFA'
+    url: '/api/user'/** @cut*/ + '?uuid=' + app.uuid
   }, function(data){
-      app.type.Provider.all.forEach(function(provider){
-        provider.set('enabled', data.user.prodivers.has(provider.data.id))
-      });
+      if (data.user)
+        app.type.Provider.all.forEach(function(provider){
+          provider.set('enabled', data.user.prodivers.has(provider.data.id))
+        });
       if (app.onProvidersInit)
       {
         app.onProvidersInit();

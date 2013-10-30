@@ -121,11 +121,10 @@
       orientation: {
         events: 'layoutChanged',
         getter: function(node){
-          return (node.orientation + '-' + node.dir.qw().slice(2, 4).join('-')).toLowerCase();
+          return (node.orientation + '-' + node.dir.split(' ').slice(2, 4).join('-')).toLowerCase();
         }
       }
     },
-
     action: {
       hide: function(){
         this.hide();
@@ -140,6 +139,7 @@
 
     visible: false,
     autorotate: false,
+    zIndex: 0,
 
     dir: '',
     defaultDir: DEFAULT_DIR,
@@ -168,11 +168,10 @@
 
       this.setLayout(this.defaultDir, this.orientation);
     },
-    templateSync: function(noRecreate){
-      UINode.prototype.templateSync.call(this, noRecreate);
+    templateSync: function(){
+      UINode.prototype.templateSync.call(this);
 
-      if (this.element)
-        this.realign();
+      this.realign();
     },
     setLayout: function(dir, orientation, noRealign){
       var oldDir = this.dir;
@@ -191,7 +190,7 @@
       }
     },
     flip: function(orientation){
-      var dir = this.dir.qw();
+      var dir = this.dir.split(' ');
       var v = orientation == ORIENTATION.VERTICAL;
 
       dir[0 + v] = FLIP[dir[0 + v]];
@@ -200,7 +199,7 @@
       this.setLayout(dir.join(' '));
     },
     rotate: function(offset){
-      var dir = this.dir.qw();
+      var dir = this.dir.split(' ');
       var result = [];
       
       offset = ((offset % 4) + 4) % 4;
@@ -242,7 +241,7 @@
         var width = this.element.offsetWidth;
         var height = this.element.offsetHeight;
 
-        dir = normalizeDir(dir, this.dir).qw();
+        dir = normalizeDir(dir, this.dir).split(' ');
 
         var pointX = dir[0] == CENTER ? box.left + (box.width >> 1) : box[dir[0].toLowerCase()];
         var pointY = dir[1] == CENTER ? box.top + (box.height >> 1) : box[dir[1].toLowerCase()];
@@ -275,7 +274,7 @@
 
       if (this.visible && this.relElement)
       {
-        var dir = this.dir.qw();
+        var dir = this.dir.split(' ');
         var point;
         var rotateOffset = 0;
         var curDir = dir;
@@ -497,7 +496,9 @@
 
       for (var popup = this.lastChild; popup; popup = popup.previousSibling)
       {
-        if (ancestorAxis.has(popup.element) || ancestorAxis.some(Array.prototype.has, popup.ignoreClickFor))
+        if (ancestorAxis.indexOf(popup.element) != -1 || ancestorAxis.some(function(element){
+          return popup.ignoreClickFor.indexOf(element) != -1;
+        }))
         {
           while (popup = popup.nextSibling)
           {
@@ -525,7 +526,7 @@
           result = popup.hideOnKey(event.key);
         else
           if (Array.isArray(popup.hideOnKey))
-            result = popup.hideOnKey.has(event.key);
+            result = popup.hideOnKey.indexOf(event.key) != -1;
 
         if (result)
           popup.hide();

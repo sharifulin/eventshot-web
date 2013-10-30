@@ -651,11 +651,6 @@
   // export names
   //
 
-  module.setWrapper(function(value){
-    ;;;basis.dev.warn('using basis.dom.event as function is deprecated now, use basis.dom.event.wrap instead');
-    return wrap(value);
-  });
-
   module.exports = {
     // support and testing
     W3CSUPPORT: W3CSUPPORT,
@@ -700,10 +695,6 @@
     
     fireEvent: fireEvent,
 
-    onLoad: function(fn){
-      ;;;basis.dev.warn('using basis.dom.event.onLoad is deprecated, use basis.ready instead');
-      return basis.ready(fn);
-    },
     onUnload: onUnload,
 
     // helpers

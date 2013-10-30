@@ -44,6 +44,7 @@
     Table: resource('templates/table/Table.tmpl'),
     Body: resource('templates/table/Body.tmpl'),
     Row: resource('templates/table/Row.tmpl'),
+    Cell: resource('templates/table/Cell.tmpl'),
 
     Header: resource('templates/table/Header.tmpl'),
     HeaderPartitionNode: resource('templates/table/HeaderPartitionNode.tmpl'),
@@ -76,18 +77,10 @@
   var HeaderGroupingNode = Class(GroupingNode, {
     className: namespace + '.HeaderGroupingNode',
     emit_ownerChanged: function(oldOwner){
-      if (oldOwner)
+      if (oldOwner && !this.owner)
         DOM.remove(this.headerRow);
 
-      if (this.owner && this.owner.element)
-      {
-        var cursor = this;
-        var element = this.owner.element;
-        do
-        {
-          DOM.insert(element, cursor.headerRow, DOM.INSERT_BEGIN);
-        } while (cursor = cursor.grouping);
-      }
+      this.syncDomRefs();
       
       GroupingNode.prototype.emit_ownerChanged.call(this, oldOwner);
     },
@@ -139,6 +132,7 @@
     */
     init: function(){
       GroupingNode.prototype.init.call(this);
+      this.nullElement = DOM.createFragment();
       this.element = this.childNodesElement = this.headerRow = DOM.createElement('tr.Basis-Table-Header-GroupContent');
     },
 
@@ -162,12 +156,35 @@
       GroupingNode.prototype.removeChild.call(oldChild);
     },
 
+    syncDomRefs: function(){
+      var cursor = this;
+      var owner = this.owner;
+      var element = null;
+
+      if (owner)
+      {
+        element = (owner.tmpl && owner.tmpl.groupsElement) || owner.childNodesElement;
+        element.appendChild(this.nullElement);
+      }
+
+      do
+      {
+        cursor.element = cursor.childNodesElement = element;
+        if (element)
+          DOM.insert(element, cursor.headerRow, DOM.INSERT_BEGIN);
+      }
+      while (cursor = cursor.grouping);
+    },
+
    /**
     * @inheritDoc
     */
     destroy: function(){
       GroupingNode.prototype.destroy.call(this);
       this.headerRow = null;
+      this.element = null;
+      this.childNodesElement = null;
+      this.nullElement;
     }
   });
 
@@ -252,7 +269,7 @@
     listen: {
       owner: {
         sortingChanged: function(owner){
-          var cell = this.childNodes.search(owner.sorting, 'colSorting');
+          var cell = basis.array.search(this.childNodes, owner.sorting, 'colSorting');
           if (cell)
           {
             cell.select();
@@ -302,6 +319,9 @@
             config.title = headerConfig.content;
           }
 
+          if ('template' in headerConfig)
+            config.template = headerConfig.template;
+
           if ('title' in headerConfig)
             config.title = headerConfig.title;
 
@@ -309,7 +329,8 @@
             config.title = config.title.call(this);
 
           // css classes
-          config.cssClassName = (headerConfig.cssClassName || '') + ' ' + (colConfig.cssClassName || '');
+          /** @cut */ if (headerConfig.cssClassName)
+          /** @cut */   basis.dev.warn('cssClassName isn\'t supported in header cell config anymore, use template property instead');
 
           // sorting
           var sorting = getter(colConfig.colSorting || colConfig.sorting);
@@ -391,9 +412,10 @@
               };
 
             // fulfill config
-            var config = {
-              cssClassName: (colConfig.cssClassName || '') + ' ' + (footerConfig.cssClassName || '')
-            };
+            var config = {};
+
+            /** @cut */ if (footerConfig.cssClassName)
+            /** @cut */   basis.dev.warn('cssClassName isn\'t supported in footer cell config anymore, use template property instead');
 
             // content in footer config is deprecated
             if ('content' in footerConfig)
@@ -401,6 +423,9 @@
               ;;;basis.dev.warn('`content` property in footer cell config is deprecated, use `value` instead');
               config.value = footerConfig.content;
             }
+
+            if ('template' in footerConfig)
+              config.value = footerConfig.template;
 
             if ('value' in footerConfig)
               config.value = footerConfig.value;
@@ -527,14 +552,39 @@
               content: cell
             };
 
-          var className = [colConfig.cssClassName || '', cell.cssClassName || ''].join(' ').trim();
           var content = cell.content;
           var contentType = typeof content;
+          var replaceContent = contentType == 'string' ? content : (contentType == 'function' ? '{__cell' + i + '}' : '');
+          var cellTemplate = cell.template || '';
+          var cellTemplateRef = namespace + '.Cell';
 
-          template += 
-            '<td' + (cell.templateRef ? '{' + cell.templateRef + '}' : '') + (className ? ' class="' + className + '"' : '') + '>' + 
-              (contentType == 'string' ? content : (contentType == 'function' ? '{__cell' + i + '}' : '')) +
-            '</td>';
+          /** @cut */ if (cell.cssClassName)
+          /** @cut */   basis.dev.warn('cssClassName isn\'t supported in body cell config anymore, use template property instead');
+
+          /** @cut */ if (colConfig.cssClassName)
+          /** @cut */   basis.dev.warn('cssClassName isn\'t supported for table column config anymore, use template property instead');
+
+          if (cellTemplate)
+          {
+            if (cellTemplate instanceof basis.template.Template)
+              cellTemplateRef = '#' + cellTemplate.templateId;
+            else
+              if (typeof cellTemplate == 'function' && cellTemplate.url)
+                cellTemplateRef = cellTemplate.url;
+              else
+                cellTemplateRef = null;
+          }
+
+
+          template +=
+            cellTemplateRef
+              ? '<b:include src="' + cellTemplateRef + '">' + 
+                  (cell.templateRef ? '<b:add-ref name="' + cell.templateRef + '"/>' : '') +
+                  (replaceContent
+                    ? '<b:replace ref="content">' + replaceContent + '</b:replace>'
+                    : '') +
+                '</b:include>'
+              : cellTemplate; // todo: replace {content} for replaceContent
 
           if (contentType == 'function')
           {

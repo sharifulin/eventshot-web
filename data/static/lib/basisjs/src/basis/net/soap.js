@@ -19,9 +19,7 @@
 
   var Class = basis.Class;
   var DOM = basis.dom;
-
   var XML = basis.xml;
-
 
 
   var QName = XML.QName;
@@ -56,7 +54,7 @@
   */ 
 
   var SOAPRequest = Class(AjaxRequest, {
-    className: namespace + 'SOAPRequest',
+    className: namespace + '.SOAPRequest',
 
     requestDataGetter: basis.fn.$self,
     responseDataGetter: basis.fn.$self,
@@ -220,7 +218,7 @@
         methodName: this.methodName,
         soapBody: requestData.soapBody || this.soapBody,
         soapHeader: requestData.soapHeader || this.soapHeader,
-        soapHeaderSections: [this.soapHeaderSections, requestData.soapHeaderSections].merge(),
+        soapHeaderSections: basis.object.merge(this.soapHeaderSections, requestData.soapHeaderSections),
         mapping: requestData.mapping || this.mapping
       });
 

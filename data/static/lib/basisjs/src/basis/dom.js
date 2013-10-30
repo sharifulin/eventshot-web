@@ -370,7 +370,7 @@
   * @param {Node} node
   * @return {string}
   */
-  var TEXT_PROPERTIES = 'textContent innerText nodeValue'.qw();
+  var TEXT_PROPERTIES = ['textContent', 'innerText', 'nodeValue'];
 
   function textContent(node){
     for (var i = 0, property; property = TEXT_PROPERTIES[i++];)
@@ -652,7 +652,7 @@
 
     // append child nodes
     if (arguments.length > 1)
-      handleInsert(element, createFragment.apply(0, arrayFrom(arguments, 1).flatten()));
+      handleInsert(element, createFragment.apply(0, basis.array.flatten(arrayFrom(arguments, 1))));
 
     // attach event handlers
     if (isConfig)
@@ -691,10 +691,7 @@
   * @return {Node|Array.<Node>} Inserted nodes (may different of source members).
   */
   function insert(node, source, insertPoint, refChild){
-    node = get(node); // TODO: remove
-
-    if (!node)
-      throw new Error('basis.dom.insert: destination node can\'t be null');
+    node = get(node) || node; // TODO: remove
 
     switch (insertPoint) {
       case undefined: // insertPoint omitted
@@ -710,7 +707,8 @@
         refChild = refChild[NEXT_SIBLING];
       break;
       default:
-        refChild = Number(insertPoint).between(0, node.childNodes.length) ? node.childNodes[insertPoint] : null;
+        insertPoint = Number(insertPoint);
+        refChild = insertPoint >= 0 && insertPoint < node.childNodes.length ? node.childNodes[insertPoint] : null;
     }
 
     var isDOMLikeObject = !isNode(node);
@@ -935,32 +933,6 @@
       return ieGetInputPosition(false);
   }
 
-  // head/body
-
-  function head(doc){
-    if (!doc)
-      doc = document || { head: null };
-
-    return doc.head || tag(doc, 'head')[0];
-  }
-
-  function body(doc){
-    if (!doc)
-      doc = document || { body: null };
-
-    return doc.body || tag(doc, 'body')[0];
-  }
-
-  function appendHead(node){
-    if (document)
-      insert(head(), node);
-    else
-    {
-      ;;;basis.dev.warn('Can\'t append to head, document not found');
-    }
-  }
-
-
   //
   // export names
   //
@@ -1059,9 +1031,5 @@
     focus: focus,
     setSelectionRange: setSelectionRange,
     getSelectionStart: getSelectionStart,
-    getSelectionEnd: getSelectionEnd,
-
-    head: head,
-    body: body,
-    appendHead: appendHead
+    getSelectionEnd: getSelectionEnd
   };

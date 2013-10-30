@@ -1,5 +1,4 @@
 
-  basis.require('basis.timer');
   basis.require('basis.data');
   basis.require('basis.data.dataset');
   basis.require('basis.data.value');
@@ -19,12 +18,12 @@
 
   var Class = basis.Class;
   
-  var nsData = basis.data;
-  var DataObject = nsData.Object;
-  var KeyObjectMap = nsData.KeyObjectMap;
-  var AbstractDataset = nsData.AbstractDataset;
+  var DataObject = basis.data.Object;
+  var KeyObjectMap = basis.data.KeyObjectMap;
+  var AbstractDataset = basis.data.AbstractDataset;
+  var DatasetWrapper = basis.data.DatasetWrapper;
 
-  var BindValue = basis.data.value.BindValue;
+  var Value = basis.data.Value;
   var MapFilter = basis.data.dataset.MapFilter;
 
 
@@ -68,7 +67,7 @@
   * Base class for indexes.
   * @class
   */
-  var Index = Class(BindValue, {
+  var Index = Class(Value, {
     className: namespace + '.Index',
     autoDestroy: true,
 
@@ -101,7 +100,7 @@
     init: function(){
       this.indexCache_ = {};
 
-      BindValue.prototype.init.call(this);
+      Value.prototype.init.call(this);
     },
 
    /**
@@ -130,7 +129,7 @@
     },
 
     destroy: function(){
-      BindValue.prototype.destroy.call(this);
+      Value.prototype.destroy.call(this);
 
       this.indexCache_ = null;
     }
@@ -379,7 +378,7 @@
     if (typeof events != 'string')
       throw 'Events must be a event names space separated string';
 
-    events = events.qw().sort();
+    events = events.trim().split(' ').sort();
 
     var indexId = [BaseClass.basisClassId_, getter.basisGetterId_, events].join('_');
     var indexConstructor = indexConstructors_[indexId];
@@ -413,7 +412,7 @@
     return function(getter, events){
       var dataset;
 
-      if (getter instanceof AbstractDataset)
+      if (getter instanceof AbstractDataset || getter instanceof DatasetWrapper)
       {
         dataset = getter;
         getter = events;
@@ -533,7 +532,7 @@
   };
 
  //
- // 
+ // getDatasetIndex/removeDatasetIndex
  //
 
  var datasetIndexes = {};
@@ -580,7 +579,7 @@
 
  /**
   * @param {basis.data.AbstractDataset} dataset
-  * @param {basis.data.index.Index}
+  * @param {basis.data.index.Index} index
   */
   function removeDatasetIndex(dataset, index){
     var indexes = datasetIndexes[dataset.basisObjectId];
@@ -599,30 +598,16 @@
     }
   }
 
+
+  //
+  // IndexMap
+  //
+
  /**
-  * Extend for basis.data.AbstractDataset
-  * @namespace basis.data.AbstractDataset
+  * @class
   */
-  AbstractDataset.extend({
-   /**
-    * @param {basis.data.index.IndexConstructor}
-    */ 
-    getIndex: function(indexConstructor){
-      ;;;basis.dev.warn('basis.data.Dataset#getIndex is deprecated and will be removed soon, use basis.data.index.getDatasetIndex or basis.data.index.{indexName} functions instead');
-      return getDatasetIndex(this, indexConstructor);
-    },
-
-   /**
-    * @param {basis.data.index.Index}
-    */
-    deleteIndex: function(index){
-      ;;;basis.dev.warn('basis.data.Dataset#deleteIndex is deprecated and will be removed soon, use basis.data.index.removeDatasetIndex fucntion instead');
-      removeDatasetIndex(this, index);
-    }
-  });
-
-
   var CalcIndexPreset = Class(null, {
+    className: namespace + '.CalcIndexPreset',
     extendConstructor_: true,
     indexes: {},
     calc: basis.fn.$null
@@ -630,7 +615,7 @@
 
   var calcIndexPreset_seed = 1;
   function getUniqueCalcIndexId(){
-    return 'calc-index-preset-' + (calcIndexPreset_seed++).lead(8);
+    return 'calc-index-preset-' + basis.number.lead(calcIndexPreset_seed++, 8);
   }
 
   function percentOfRange(getter, events){
@@ -697,9 +682,11 @@
 
     indexes: null,
     indexes_: null,
+    indexesBind_: null,
 
     timer_: undefined,
     indexUpdated: null,
+    indexValues: null,
     memberSourceMap: null,
     keyMap: null,
 
@@ -746,10 +733,10 @@
 
     listen: {
       index: {
-        change: function(sender, value){
+        change: function(sender){
           var indexMap = this.indexMap;
 
-          indexMap.indexValues[this.key] = value;
+          indexMap.indexValues[this.key] = sender.value;
           indexMap.indexUpdated = true;
           indexMap.recalcRequest();
         }
@@ -814,7 +801,7 @@
           }
           else
           {
-            ;;;basis.dev.warn('Index `{0}` already exists'.format(key));
+            ;;;basis.dev.warn('Index `' + key + '` already exists');
             return;
           }
         }
@@ -844,7 +831,7 @@
       }
       else
       {
-        ;;;basis.dev.warn('Index `{0}` already exists'.format(key));
+        ;;;basis.dev.warn('Index `' + key + '` already exists');
       }
     },
 
@@ -897,7 +884,7 @@
 
     recalcRequest: function(){
       if (!this.timer_)
-        this.timer_ = basis.timer.setImmediate(this.recalc);
+        this.timer_ = basis.setImmediate(this.recalc);
     },
 
     recalc: function(){
@@ -905,7 +892,7 @@
         this.calcMember(this.items_[idx]);
 
       this.indexUpdated = false;
-      this.timer_ = basis.timer.clearImmediate(this.timer_);
+      this.timer_ = basis.clearImmediate(this.timer_);
     },
 
     calcMember: function(member){

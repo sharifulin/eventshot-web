@@ -27,7 +27,7 @@
   //
 
   function timePosition(startTime, duration){
-    return (Date.now() - startTime).fit(0, duration) / duration;
+    return basis.number.fit(Date.now() - startTime, 0, duration) / duration;
   }
 
   //
@@ -46,10 +46,7 @@
         fn = global[prefixes[i] + name];
     }
 
-    if (!fn)
-      fn = fallback;
-
-    return fn && fn.bind(global);
+    return fn ? fn.bind(global) : fallback;
   }
 
   var requestAnimationFrame = createMethod('requestAnimationFrame',
@@ -58,7 +55,11 @@
     }
   );
 
-  var cancelAnimationFrame = createMethod('cancelRequestAnimationFrame') || createMethod('cancelAnimationFrame', clearTimeout);
+  var cancelAnimationFrame = createMethod('cancelRequestAnimationFrame') || createMethod('cancelAnimationFrame',
+    function(id){
+      clearTimeout(id);
+    }
+  );
 
 
  /**
@@ -76,13 +77,13 @@
     emit_start: createEvent('start'),
     emit_finish: createEvent('finish'),
     emit_invert: createEvent('invert'),
-    emit_change: function(value, prevValue){
-      if (value == 0.0)
+    emit_change: function(prevValue){
+      if (this.value == 0.0)
         this.emit_start();
 
-      Property.prototype.emit_change.call(this, value, prevValue);
+      Property.prototype.emit_change.call(this, prevValue);
 
-      if (value == 1.0)
+      if (this.value == 1.0)
         this.emit_finish();
     },
 
@@ -173,8 +174,8 @@
           this.start += this.range;
           this.range *= -1;
         },
-        change: function(sender, progress){
-          this.setter(this.start + this.range * this.timeFunction(progress));
+        change: function(){
+          this.setter(this.start + this.range * this.timeFunction(this.value));
         },
         finish: function(){
           if (!this.notInvert)

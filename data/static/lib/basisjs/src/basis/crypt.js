@@ -9,6 +9,8 @@
 
   var arrayFrom = basis.array.from;
   var createArray = basis.array.create;
+  var repeatArray = basis.array.repeat;
+  var flatten = basis.array.flatten;
   var UTF16 = basis.utils.utf16;
   var UTF8 = basis.utils.utf8;
   var base64 = basis.utils.base64;
@@ -46,7 +48,7 @@
     if (Array.isArray(input))
       output = input.map(hex);
     else
-      output = String(input).toArray().map(function(c){ return number2hex(c.charCodeAt(0)); });
+      output = String(input).split('').map(function(c){ return number2hex(c.charCodeAt(0)); });
 
     return output.join('');
   }
@@ -142,7 +144,7 @@
       }
 
       // return sha1 hash bytes array
-      return H.map(vector).flatten();
+      return flatten(H.map(vector));
     };
   })();
 
@@ -171,7 +173,12 @@
     ];
 
     function initConst(){
-      S = [[7,12,17,22].repeat(4), [5,9,14,20].repeat(4), [4,11,16,23].repeat(4), [6,10,15,21].repeat(4)].flatten();
+      S = flatten([
+        repeatArray([7,12,17,22], 4),
+        repeatArray([5,9,14,20], 4),
+        repeatArray([4,11,16,23], 4),
+        repeatArray([6,10,15,21], 4)
+      ]);
 
       for (var i = 0; i < 64; i++)
       {
@@ -259,7 +266,7 @@
       }
 
       // return md5 hash bytes array
-      return A.map(vector).flatten();
+      return flatten(A.map(vector));
     };
   })();
 
@@ -297,11 +304,6 @@
   // export names
   //
 
-  module.setWrapper(function(){
-    ;;;basis.dev.warn('using basis.crypt as function is deprecated now, use basis.crypt.wrap instead');
-    return wrap.apply(this, arguments);
-  });
-
   module.exports = {
     hex: hex,
     sha1: sha1,
@@ -309,23 +311,3 @@
 
     wrap: wrap
   };
-
-
-  // deprecated
-  basis.object.extend(module.exports, {
-    UTF16: basis.object.slice(UTF16),
-    UTF8: basis.object.slice(UTF8),
-    Base64: basis.object.slice(base64),
-    HEX: function(){
-      ;;;basis.dev.warn('basis.crypt.HEX is deprecated, use basis.crypt.hex instead');
-      return HEX.apply(this, arguments); 
-    },
-    SHA1: function(){
-      ;;;basis.dev.warn('basis.crypt.SHA1 is deprecated, use basis.crypt.sha1 instead');
-      return SHA1.apply(this, arguments);
-    }, 
-    MD5: function(){
-      ;;;basis.dev.warn('basis.crypt.MD5 is deprecated, use basis.crypt.md5 instead');
-      return MD5.apply(this, arguments);
-    }
-  });
