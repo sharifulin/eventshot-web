@@ -25,6 +25,24 @@
   box-shadow: 1px 1px 3px rgba(0,0,0,.3);
 }
 
+.app-eventlist-item_delete
+{
+  display: none;
+  position: absolute;
+  right: 3px;
+  top: 3px;
+  background: rgba(255,0,0,.5);
+  padding: 3px 6px;
+}
+.app-eventlist-item_delete:hover
+{
+  background: rgba(255,0,0,.75);
+}
+.app-eventlist-item:hover .app-eventlist-item_delete
+{
+  display: block;
+}
+
 .app-eventlist-item_defcover
 {
   position: absolute;

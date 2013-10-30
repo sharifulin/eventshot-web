@@ -153,7 +153,7 @@ Event.extend({
 
   remove: app.service['default'].createAction({
     method: 'POST',
-    url: '/api/:id/remove',
+    url: '/api/event/:id/remove',
     request: function(){
       return {
         routerParams: {
@@ -162,7 +162,8 @@ Event.extend({
       };
     },
     success: function(data){
-      this.destroy();
+      if (data.ok)
+        this.destroy();
     }
   })
 });

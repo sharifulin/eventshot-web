@@ -18,6 +18,9 @@ var Entry = basis.entity.createType('Entry', {
 
 var reader_ = Entry.entityType.reader;
 Entry.entityType.reader = function(data){
+  if (data && data.hidden === '0')
+    data.hidden = false;
+
   if (data && data.data)
   {
     data.created = data.data.created;

@@ -66,6 +66,9 @@ module.exports = new basis.ui.Node({
     action: {
       showDetails: function(){
         basis.router.navigate('/event/' + this.data.id);
+      },
+      remove: function(){
+        this.target.remove();
       }
     },
     satelliteConfig: {

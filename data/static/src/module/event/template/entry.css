@@ -7,12 +7,18 @@
   overflow: hidden;
 }
 
+.app-event-entry_source-icon IMG,
+.app-event-entry_content
+{
+  -webkit-transition: opacity .22s;
+  transition: opacity .22s;
+}
+
+
 .app-event-entry_hidden .app-event-entry_source-icon IMG,
 .app-event-entry_hidden .app-event-entry_content
 {
   opacity: .2;
-  -webkit-transition: opacity .22s;
-  transition: opacity .22s;
 }
 .app-event-entry_hidden:hover .app-event-entry_source-icon IMG,
 .app-event-entry_hidden:hover .app-event-entry_content

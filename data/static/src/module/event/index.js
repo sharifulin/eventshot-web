@@ -136,7 +136,7 @@ var view = new basis.ui.Node({
         change: function(event){
           if (event.type == 'blur' || (event.type == 'keyup' && event.key == event.KEY.ENTER))
           {
-            if (this.modified && 'title' in this.modified)
+            if (this.target.modified && 'title' in this.target.modified)
             {
               var id = this.data.id;
               basis.net.request({
@@ -196,7 +196,7 @@ var view = new basis.ui.Node({
         change: function(event){
           if (event.type == 'blur' || (event.type == 'keyup' && event.key == event.KEY.ENTER))
           {
-            if (this.modified && 'description' in this.modified)
+            if (this.target.modified && 'description' in this.target.modified)
             {
               var id = this.data.id;
               basis.net.request({
