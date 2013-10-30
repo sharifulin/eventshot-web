@@ -1,8 +1,11 @@
 <b:style src="entry.css"/>
 
-<div class="app-event-entry">
-  <a href="{url}" target="_blank">
-    <img class="app-event-entry_source-icon" src="{sourceImage}" width="46"/>
+<div class="app-event-entry app-event-entry_{hidden}">
+  <a class="app-event-entry_source" href="{url}" target="_blank">
+    <span class="app-event-entry_delete" event-click="remove" title="Hide entry">Remove</span>
+    <span class="app-event-entry_source-icon">
+      <img src="{sourceImage}" width="46"/>
+    </span>
   </a>
   <div class="app-event-entry_content">
     <!--{content}-->

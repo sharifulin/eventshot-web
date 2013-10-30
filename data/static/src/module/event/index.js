@@ -36,6 +36,13 @@ var EntryNode = new basis.ui.Node.subclass({
       getter: function(node){
         return node.data.created.split(' ')[1].split(':').slice(0, 2).join(':');
       }
+    },
+    hidden: 'data:hidden'
+  },
+  action: {
+    remove: function(event){
+      this.target.toggleHidden();
+      event.die();
     }
   }
 });

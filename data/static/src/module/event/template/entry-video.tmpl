@@ -5,8 +5,7 @@
   <b:replace ref="content">
     <div class="app-event-entry-video_video-card_wrapper">
       <div class="app-event-entry-video_video-card">
-        <video width="{v_width}" height="{v_height}" controls>
-          <source src="{videoUrl}" type="video/{videoFormat}"/>
+        <video width="{v_width}" height="{v_height}" controls src="{videoUrl}">
           <img class="app-event-entry-video_image" src="{imageUrl}" width="{width}" height="{height}"/>
         </video>
         <div class="app-event-entry-video_title app-event-entry-video_title__{title}" style="max-width: {v_width}px">

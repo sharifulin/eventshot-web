@@ -12,7 +12,8 @@ var Entry = basis.entity.createType('Entry', {
   created: String,
   data: function(value){
     return value || '';
-  }
+  },
+  hidden: Boolean
 });
 
 var reader_ = Entry.entityType.reader;
@@ -26,6 +27,27 @@ Entry.entityType.reader = function(data){
 
   return reader_.call(this, data);
 };
+
+Entry.extend({
+  toggleHidden: app.service['default'].createAction({
+    method: 'POST',
+    url: '/api/event_item/:id/update',
+    request: function(){
+      this.set('hidden', !this.data.hidden, true);
+      return {
+        routerParams: {
+          id: this.data.id
+        },
+        params: {
+          hidden: 1
+        }
+      };
+    },
+    success: function(data){
+      this.update(data.event_item);
+    }
+  })
+});
 
 //
 // export names
