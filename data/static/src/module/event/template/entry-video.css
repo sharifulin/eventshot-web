@@ -1,0 +1,42 @@
+.app-event-entry-video
+{
+  padding: 15px 5px 10px;
+}
+.app-event-entry-video .app-event-entry_source-icon
+{
+  margin-top: 0;
+}
+.app-event-entry-video_video-card_wrapper
+{
+  overflow: hidden;  
+  display: inline-block;  
+  border: 1px solid #F0F0F0;
+  border-color: #F0F0F0 #E0E0E0 #E0E0E0 #F0F0F0;
+  box-shadow: 1px 1px 2px rgba(0,0,0,.1);
+  border-radius: 3px;
+  background: white;
+}
+.app-event-entry-video_video-card
+{
+  border: 4px solid rgba(255,255,255,.2);
+  position: relative;
+}
+.app-event-entry-video_title
+{
+  line-height: 1.5;
+  text-align: right;
+}
+.app-event-entry-video_title-text
+{
+  padding: 2px 0 2px 2px;
+  display: inline-block;
+  background: padding-box rgba(255,255,255,.85);  
+}
+.app-event-entry-video_image
+{
+  vertical-align: middle;
+}
+.app-event-entry-video A
+{
+  color: black;
+}

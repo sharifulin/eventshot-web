@@ -1,0 +1,18 @@
+<b:style src="entry-video.css"/>
+<b:define name="title" type="bool"/>
+
+<b:include src="entry.tmpl" class="app-event-entry-video">
+  <b:replace ref="content">
+    <div class="app-event-entry-video_video-card_wrapper">
+      <div class="app-event-entry-video_video-card">
+        <video width="{v_width}" height="{v_height}" controls>
+          <source src="{videoUrl}" type="video/{videoFormat}"/>
+          <img class="app-event-entry-video_image" src="{imageUrl}" width="{width}" height="{height}"/>
+        </video>
+        <div class="app-event-entry-video_title app-event-entry-video_title__{title}" style="max-width: {v_width}px">
+          <span class="app-event-entry-video_title-text"><span{title}/> <a href="#">{time}</a></span>
+        </div>
+      </div>
+    </div>
+  </b:replace>
+</div>

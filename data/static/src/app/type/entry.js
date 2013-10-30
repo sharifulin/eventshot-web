@@ -18,7 +18,11 @@ var Entry = basis.entity.createType('Entry', {
 var reader_ = Entry.entityType.reader;
 Entry.entityType.reader = function(data){
   if (data && data.data)
+  {
     data.created = data.data.created;
+    if (data.data.video)
+      data.type = 'video';
+  }
 
   return reader_.call(this, data);
 };

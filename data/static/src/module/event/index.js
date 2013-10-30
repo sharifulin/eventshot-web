@@ -40,29 +40,61 @@ var EntryNode = new basis.ui.Node.subclass({
   }
 });
 
+var TextEntryNode = EntryNode.subclass({
+  template: resource('template/entry-text.tmpl'),
+  binding: {
+    content: {
+      events: 'update',
+      getter: function(node){
+        return node.data.data.title.replace(/(https?:\/\/[a-z0-9\.\-]+\/[^\s\.\,\"]+)/ig, '<a href="$1" target="_blank">$1</a>');
+      }
+    }
+  }
+});
+
+var PhotoEntryNode = EntryNode.subclass({
+  template: resource('template/entry-photo.tmpl'),
+  binding: {
+    imageUrl: 'data:data.photo',
+    width: 'data:data.width',
+    height: 'data:data.height',
+    title: {
+      events: 'update',
+      getter: function(node){
+        return (node.data.data.title || '').replace(/(https?:\/\/[a-z0-9\.\-]+\/[^\s\.\,\"]+)/ig, '<a href="$1" target="_blank">$1</a>');
+      }
+    }
+  }
+});
+
+var VideoEntryNode = PhotoEntryNode.subclass({
+  template: resource('template/entry-video.tmpl'),
+  binding: {
+    videoUrl: 'data:data.video',
+    v_width: 'data:data.v_width',
+    v_height: 'data:data.v_height',
+    videoFormat: {
+      events: 'update',
+      getter: function(node){
+        return node.data.data.video.split(".").pop();
+      }
+    }
+  }
+});
+
+var WeatherEntryNode = EntryNode.subclass({
+  template: resource('template/entry-weather.tmpl'),
+  binding: {
+    image: 'data:data.pic',
+    title: 'data:data.title'
+  }
+});
+
 var entryViews = {
-  text: EntryNode.subclass({
-    template: resource('template/entry-text.tmpl'),
-    binding: {
-      content: 'data:data.title'
-    }
-  }),
-  photo: EntryNode.subclass({
-    template: resource('template/entry-photo.tmpl'),
-    binding: {
-      imageUrl: 'data:data.photo',
-      title: 'data:data.title',
-      width: 'data:data.width',
-      height: 'data:data.height'
-    }
-  }),
-  weather: EntryNode.subclass({
-    template: resource('template/entry-weather.tmpl'),
-    binding: {
-      image: 'data:data.pic',
-      title: 'data:data.title'
-    }
-  })
+  text: TextEntryNode,
+  photo: PhotoEntryNode,
+  video: VideoEntryNode,
+  weather: WeatherEntryNode
 };
 
 var view = new basis.ui.Node({

@@ -15,7 +15,7 @@ var defaultService = new basis.net.service.Service({
   }, function(data){
       if (data.user)
         app.type.Provider.all.forEach(function(provider){
-          provider.set('enabled', data.user.prodivers.has(provider.data.id))
+          provider.set('enabled', data.user.prodivers.indexOf(provider.data.id) != -1)
         });
       if (app.onProvidersInit)
       {
