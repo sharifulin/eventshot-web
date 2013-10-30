@@ -136,16 +136,19 @@ var view = new basis.ui.Node({
         change: function(event){
           if (event.type == 'blur' || (event.type == 'keyup' && event.key == event.KEY.ENTER))
           {
-            var id = this.data.id;
-            basis.net.request({
-              method: 'POST',
-              params: {
-                title: this.data.title
-              },
-              url: '/api/event/' + this.data.id /** @cut */ + '?uuid=' + app.uuid
-            }, function(data){
-              app.type.Event(id).set('title', data.event.title);
-            });
+            if (this.modified && 'title' in this.modified)
+            {
+              var id = this.data.id;
+              basis.net.request({
+                method: 'POST',
+                params: {
+                  title: this.data.title
+                },
+                url: '/api/event/' + this.data.id /** @cut */ + '?uuid=' + app.uuid
+              }, function(data){
+                app.type.Event(id).set('title', data.event.title);
+              });
+            }
           }
           else
             this.target.set('title', this.tmpl.input.value, true);
@@ -193,17 +196,19 @@ var view = new basis.ui.Node({
         change: function(event){
           if (event.type == 'blur' || (event.type == 'keyup' && event.key == event.KEY.ENTER))
           {
-            var id = this.data.id;
-            basis.net.request({
-              r: 1,
-              method: 'POST',
-              params: {
-                description: this.data.description
-              },
-              url: '/api/event/' + this.data.id /** @cut */ + '?uuid=' + app.uuid
-            }, function(data){
-              app.type.Event(id).set('description', data.event.description);
-            });
+            if (this.modified && 'description' in this.modified)
+            {
+              var id = this.data.id;
+              basis.net.request({
+                method: 'POST',
+                params: {
+                  description: this.data.description
+                },
+                url: '/api/event/' + this.data.id /** @cut */ + '?uuid=' + app.uuid
+              }, function(data){
+                app.type.Event(id).set('description', data.event.description);
+              });
+            }
           }
           else
             this.target.set('description', this.tmpl.input.value, true);

@@ -39,12 +39,12 @@ Entry.extend({
           id: this.data.id
         },
         params: {
-          hidden: 1
+          hidden: Number(this.data.hidden)
         }
       };
     },
     success: function(data){
-      this.update(data.event_item);
+      this.commit(Entry.reader(data.event_item));
     }
   })
 });
